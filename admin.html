@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        /* [UI 스타일] */
+        /* [기본 UI 스타일] */
         :root { --primary-color: #1c69d4; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-main: #262626; --text-sub: #666666; --accent-red: #d12a2a; }
         body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 40px 20px; margin: 0; }
         .admin-container { max-width: 1300px; margin: 0 auto; }
@@ -31,10 +31,10 @@
         .qr-thumb { width: 48px; height: 48px; border-radius: 6px; border: 1px solid #eee; }
         .worker-badge { background: #eef2f7; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
 
-        /* 🔥 [핵심] 송장 사이즈 축소 및 여백 제거 설정 */
+        /* 🔥 [핵심] 인쇄 여백 제로 및 레이아웃 최적화 설정 */
         @media print {
             @page {
-                margin: 0; 
+                margin: 0; /* 브라우저 강제 여백 완전 제거 */
                 size: auto;
             }
             body { margin: 0; padding: 0; background: #fff; }
@@ -48,22 +48,22 @@
             }
             
             .print-card { 
-                width: 85%; /* 전체 사이즈 소폭 축소 */
-                max-width: 320px; /* 라벨 너비에 맞춰 자동 조절 */
-                margin: 5mm auto; /* 상하 여백 살짝 부여 */
-                padding: 4mm; 
-                border: 3px solid #000; 
+                /* 라벨 너비에 맞춰 자동 조절되도록 설정 */
+                width: 100%; 
+                margin: 0;
+                padding: 5mm; 
+                border: 4px solid #000; 
                 box-sizing: border-box;
                 page-break-after: always;
                 font-family: 'Noto Sans KR', sans-serif;
             }
-            .label-header { background: #000; color: #fff; padding: 8px; text-align: center; font-size: 18px; font-weight: 900; }
-            .label-body { display: flex; border-bottom: 2px solid #000; }
-            .label-qr { width: 35%; padding: 8px; border-right: 2px solid #000; display: flex; align-items: center; justify-content: center; }
-            .label-qr img { width: 100%; height: auto; max-width: 100px; }
-            .label-info { flex: 1; padding: 10px; font-size: 14px; line-height: 1.5; font-weight: 600; }
-            .label-footer { padding: 12px; text-align: center; }
-            .big-text { font-size: 22px; font-weight: 900; display: block; margin-top: 4px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; }
+            .label-header { background: #000; color: #fff; padding: 12px; text-align: center; font-size: 24px; font-weight: 900; }
+            .label-body { display: flex; border-bottom: 3px solid #000; }
+            .label-qr { width: 40%; padding: 15px; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; }
+            .label-qr img { width: 100%; height: auto; max-width: 150px; }
+            .label-info { flex: 1; padding: 15px; font-size: 18px; line-height: 1.8; font-weight: 600; }
+            .label-footer { padding: 20px; text-align: center; }
+            .big-text { font-size: 30px; font-weight: 900; display: block; margin-top: 8px; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
         }
         #print-section { display: none; }
     </style>
@@ -134,20 +134,24 @@
         if (start) query = query.gte('교환일', start);
         if (end) query = query.lte('교환일', end);
         const { data, error } = await query.order('교환일', { ascending: isAsc });
-        if (error) return;
+        if (error) return alert("Error: " + error.message);
         fetchedData = data;
         renderTable(data);
     }
 
     function renderTable(data) {
         const tbody = document.getElementById('table-body');
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:80px; color:#999;">해당 기간에 데이터가 없습니다.</td></tr>';
+            return;
+        }
         tbody.innerHTML = data.map(item => `
-            <tr>
+            <tr id="row-${item.id}">
                 <td style="text-align: center;"><input type="checkbox" class="row-check" value="${item.id}"></td>
                 <td><img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
                 <td><span class="vin-text">${item.차대번호}</span></td>
                 <td><div style="font-weight:600;">${item.품번}</div><div style="font-size:12px; color:#666;">${item.품명}</div></td>
-                <td>${item.교환일}</td>
+                <td style="font-weight: 500;">${item.교환일}</td>
                 <td><span class="worker-badge">${item.작업자}</span></td>
                 <td style="text-align: right;">
                     <button class="btn" style="display:inline-flex; background:#f0f4f8; color:#1c69d4; padding:5px 10px;" onclick='printInvoice(${JSON.stringify(item)})'>인쇄</button>
@@ -161,7 +165,7 @@
     function changeSort() { isAsc = !isAsc; document.getElementById('sort-icon').innerText = isAsc ? '↑' : '↓'; loadData(); }
 
     function getInvoiceHTML(item) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
         return `
             <div class="print-card">
                 <div class="label-header">고품 반납 송장</div>
@@ -174,10 +178,10 @@
                     </div>
                 </div>
                 <div class="label-footer">
-                    <span style="font-size:11px; font-weight:bold;">PART NUMBER</span>
+                    <span style="font-size:13px; font-weight:bold;">PART NUMBER</span>
                     <span class="big-text">${item.품번}</span>
-                    <div style="margin-top:10px; border-top:1px solid #000; padding-top:8px;">
-                        <span style="font-size:11px; font-weight:bold;">VIN (LAST 7)</span>
+                    <div style="margin-top:15px; border-top:2px solid #000; padding-top:10px;">
+                        <span style="font-size:13px; font-weight:bold;">VIN (LAST 7)</span>
                         <span class="big-text">${item.차대번호.slice(-7)}</span>
                     </div>
                 </div>
@@ -205,7 +209,7 @@
     function downloadExcel() {
         const ws = XLSX.utils.json_to_sheet(fetchedData.map(i => ({ "날짜": i.교환일, "VIN": i.차대번호, "품번": i.품번, "품명": i.품명, "작업자": i.작업자 })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "List");
-        XLSX.writeFile(wb, `고품반납_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.writeFile(wb, `Warranty_Returns_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 </script>
 </body>
