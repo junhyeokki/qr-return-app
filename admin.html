@@ -5,158 +5,170 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BMW Warranty Admin - Premium</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=JetBrains+Mono:wght@800&display=swap" rel="stylesheet">
     <style>
-        /* [관리 페이지 UI 스타일] */
-        :root { --primary-color: #1c69d4; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-main: #262626; }
+        /* [1. 관리 페이지 기본 UI] */
+        :root { --primary-color: #1c69d4; --bg-color: #f4f7f9; }
         body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; }
-        .admin-container { max-width: 1200px; margin: 0 auto; }
-        .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .control-bar { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .btn { padding: 8px 15px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
-        .btn-multi-print { background: var(--primary-color); color: white; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
-        th { background: #f8f9fa; padding: 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #eee; }
-        td { padding: 12px; border-bottom: 1px solid #f9f9f9; font-size: 14px; }
-        .qr-thumb { width: 40px; height: 40px; }
+        .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; }
+        td { padding: 15px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: middle; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .btn-print { background: #2ecc71; color: white; margin-right: 5px; }
+        .btn-sel-print { background: #1c69d4; color: white; }
+        .qr-img { width: 45px; height: 45px; border: 1px solid #eee; border-radius: 4px; }
 
-        /* 🔥 [인쇄 스타일] 요청 사항: 노란색 공간 제거 및 가로 밀착 배치 */
+        /* [2. 인쇄 핵심 설정] 요청하신 노란색 빈 공간 제거 및 가로 밀착 레이아웃 */
         @media print {
-            @page {
-                margin: 0; 
-                size: auto; 
-            }
-            body { margin: 0; padding: 0; }
-            body * { display: none !important; }
-            #print-section, #print-section * { display: block !important; }
-            
-            .print-card { 
-                display: flex !important; /* 가로 배열 강제 */
-                flex-direction: row !important; 
+            @page { margin: 0; size: auto; }
+            body { margin: 0; padding: 0; background: #fff; }
+            body * { display: none !important; } /* 전체 숨김 */
+            #print-area, #print-area * { display: flex !important; } /* 인쇄 영역만 강제 노출 */
+
+            #print-area {
                 width: 100%;
-                max-width: 100mm; /* 일반적인 라벨 너비 */
+                flex-direction: column;
+            }
+
+            .label-card {
+                display: flex !important; /* 가로 배치 */
+                flex-direction: row !important;
+                width: 95mm; /* 라벨지 표준 가로 */
+                height: 40mm; /* 높이 대폭 축소 (빈 공간 삭제) */
                 border: 2px solid #000;
-                padding: 3mm !important;
                 margin: 0;
+                padding: 3mm !important;
                 box-sizing: border-box;
                 page-break-after: always;
-                align-items: center; /* 세로 중앙 정렬 */
-                gap: 5mm; /* QR과 정보 사이 간격 */
+                align-items: center; 
+                gap: 10px;
             }
 
-            .label-qr {
-                width: 30mm !important;
+            .qr-side {
+                width: 32mm !important;
+                height: 32mm !important;
                 flex-shrink: 0;
             }
-            .label-qr img { width: 100%; height: auto; }
+            .qr-side img { width: 100%; height: 100%; }
 
-            .label-info {
+            .info-side {
                 flex-grow: 1;
                 display: flex !important;
                 flex-direction: column !important;
-                gap: 1mm; /* 정보 간 좁은 간격 */
-                font-family: 'Noto Sans KR', sans-serif;
+                justify-content: center;
+                gap: 2px;
             }
 
-            /* 텍스트 크기 최적화 (공간 낭비 제거) */
-            .info-row { font-size: 12px; font-weight: 700; line-height: 1.2; }
-            .info-label { font-size: 10px; color: #555; margin-right: 5px; }
-
-            .highlight-box {
-                margin-top: 2mm;
-                padding-top: 2mm;
-                border-top: 1px solid #000;
+            .line { font-size: 11px; font-weight: 700; color: #000; line-height: 1.2; }
+            .data-box {
+                margin-top: 4px;
+                padding-top: 4px;
+                border-top: 1.5px solid #000;
             }
-
-            .big-text { 
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 18px; 
+            .val-label { font-size: 9px; color: #444; display: block; }
+            .val-text { 
+                font-family: 'JetBrains Mono', monospace; 
+                font-size: 19px; 
                 font-weight: 800; 
-                display: block;
                 line-height: 1.1;
+                letter-spacing: -0.5px;
             }
-            .small-cap { font-size: 9px; font-weight: bold; }
         }
-        #print-section { display: none; }
+        #print-area { display: none; }
     </style>
 </head>
 <body>
 
 <div class="admin-container">
-    <div class="header-section">
-        <h1>고품 반납 관리</h1>
-        <button class="btn btn-multi-print" onclick="printSelected()">🖨️ 선택 인쇄</button>
+    <div class="header">
+        <h2 style="margin:0;">📦 고품 반납 관리 리스트</h2>
+        <button class="btn btn-sel-print" onclick="printSelected()">선택 인쇄</button>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th style="width:30px;"><input type="checkbox" id="check-all" onclick="toggleAll(this)"></th>
+                <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
                 <th>QR</th>
                 <th>차대번호</th>
-                <th>품번/품명</th>
+                <th>품번 / 품명</th>
                 <th>교환일</th>
                 <th>작업자</th>
+                <th>기능</th>
             </tr>
         </thead>
-        <tbody id="table-body"></tbody>
+        <tbody id="list-body"></tbody>
     </table>
 </div>
 
-<div id="print-section"></div>
+<div id="print-area"></div>
 
 <script>
     const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let fetchedData = [];
+    let masterData = [];
 
-    async function loadData() {
+    async function fetchData() {
         const { data } = await sb.from('qr_returns').select('*').order('교환일', { ascending: false });
-        fetchedData = data;
-        document.getElementById('table-body').innerHTML = data.map(item => `
+        masterData = data;
+        render(data);
+    }
+
+    function render(data) {
+        document.getElementById('list-body').innerHTML = data.map(item => `
             <tr>
                 <td><input type="checkbox" class="row-check" value="${item.id}"></td>
-                <td><img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
-                <td>${item.차대번호}</td>
-                <td><b>${item.품번}</b><br><small>${item.품명}</small></td>
+                <td><img class="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
+                <td style="font-family: 'JetBrains Mono'; font-weight:700;">${item.차대번호}</td>
+                <td><b>${item.품번}</b><br><small style="color:#666;">${item.품명}</small></td>
                 <td>${item.교환일}</td>
                 <td>${item.작업자}</td>
+                <td>
+                    <button class="btn btn-print" onclick="printOne('${item.id}')">인쇄</button>
+                </td>
             </tr>
         `).join('');
     }
 
-    function toggleAll(source) { document.querySelectorAll('.row-check').forEach(cb => cb.checked = source.checked); }
+    function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
 
-    function getInvoiceHTML(item) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+    function makeLabel(item) {
+        const qr = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
         return `
-            <div class="print-card">
-                <div class="label-qr"><img src="${qrUrl}"></div>
-                <div class="label-info">
-                    <div class="info-row"><span class="info-label">교환일:</span>${item.교환일}</div>
-                    <div class="info-row"><span class="info-label">작업자:</span>${item.작업자}</div>
-                    <div class="info-row"><span class="info-label">품명:</span>${item.품명}</div>
-                    <div class="highlight-box">
-                        <span class="small-cap">PART NUMBER</span>
-                        <span class="big-text">${item.품번}</span>
-                        <span class="small-cap" style="margin-top:1mm; display:block;">VIN (LAST 7)</span>
-                        <span class="big-text">${item.차대번호.slice(-7)}</span>
+            <div class="label-card">
+                <div class="qr-side"><img src="${qr}"></div>
+                <div class="info-side">
+                    <div class="line">교환일: ${item.교환일}</div>
+                    <div class="line">작업자: ${item.작업자}</div>
+                    <div class="line">품명: ${item.품명}</div>
+                    <div class="data-box">
+                        <span class="val-label">PART NUMBER</span>
+                        <span class="val-text">${item.품번}</span>
+                        <span class="val-label" style="margin-top:2px;">VIN (LAST 7)</span>
+                        <span class="val-text">${item.차대번호.slice(-7)}</span>
                     </div>
                 </div>
             </div>`;
     }
 
+    function printOne(id) {
+        const target = masterData.find(i => i.id == id);
+        document.getElementById('print-area').innerHTML = makeLabel(target);
+        setTimeout(() => { window.print(); }, 300);
+    }
+
     function printSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
-        if (ids.length === 0) return alert("인쇄할 항목을 선택해 주세요.");
-        const selected = fetchedData.filter(i => ids.includes(i.id));
-        document.getElementById('print-section').innerHTML = selected.map(item => getInvoiceHTML(item)).join('');
+        const checkedIds = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
+        if(checkedIds.length === 0) return alert("항목을 선택하세요.");
+        const targets = masterData.filter(i => checkedIds.includes(String(i.id)));
+        document.getElementById('print-area').innerHTML = targets.map(t => makeLabel(t)).join('');
         setTimeout(() => { window.print(); }, 500);
     }
 
-    loadData();
+    fetchData();
 </script>
 </body>
 </html>
