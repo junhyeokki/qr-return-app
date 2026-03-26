@@ -26,8 +26,8 @@
         th { padding: 15px; text-align: left; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; text-transform: uppercase; }
         td { padding: 18px 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
 
-        /* 노란 동그라미 위치에 들어갈 상태 태그 */
-        .status-tag { font-weight: 800; color: var(--success); background: #f0fdf4; padding: 4px 10px; border-radius: 15px; font-size: 12px; margin-left: 10px; white-space: nowrap; border: 1px solid #dcfce7; }
+        /* 상태 표시 태그 */
+        .status-tag { font-weight: 800; color: var(--success); background: #f0fdf4; padding: 4px 10px; border-radius: 15px; font-size: 12px; margin-left: 8px; white-space: nowrap; }
 
         @media print {
             @page { size: A4; margin: 0; }
@@ -139,16 +139,14 @@
             const isPartMatch = originPart.replace(/[^a-zA-Z0-9]/g, '') === scPart.replace(/[^a-zA-Z0-9]/g, '');
 
             if (isVinMatch && isPartMatch) {
-                if(confirm(`[판독 결과: 일치]\n수거 완료 처리하시겠습니까?`)) {
+                if(confirm(`[판독 결과: 일치]\n차대: ${scVin}\n품번: ${scPart}\n수거 완료 처리하시겠습니까?`)) {
                     await sb.from('qr_returns').update({ 
                         bmw_qr_code: decodedText,
                         차대번호: scVin,
                         품번: scPart,
                         교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`
                     }).eq('id', id);
-                    closeScanner(); 
-                    // DB 업데이트 후 데이터를 다시 불러와서 화면을 갱신합니다.
-                    fetchData(); 
+                    closeScanner(); fetchData();
                 }
             } else {
                 alert(`⚠️ 정보 불일치!\n기존: ${originVin} / ${originPart}\n스캔: ${scVin} / ${scPart}`);
