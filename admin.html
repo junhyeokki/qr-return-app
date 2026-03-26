@@ -6,28 +6,35 @@
     <title>고품 관리자 모드</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 30px; }
+        /* 기본 화면 스타일 */
+        body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 30px; margin: 0; }
         .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
         h1 { font-size: 24px; margin-bottom: 20px; color: #1a1a1a; display: flex; justify-content: space-between; align-items: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
         th { background: #f1f3f5; color: #495057; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
         td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
         .qr-thumb { width: 50px; height: 50px; border: 1px solid #eee; border-radius: 4px; }
-        .btn-row-print { padding: 6px 12px; background: #3ecf8e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-row-print:hover { background: #34b37b; }
+        .btn-row-print { padding: 8px 15px; background: #3ecf8e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; }
+        .btn-row-print:hover { background: #34b37b; transform: translateY(-1px); }
 
-        /* 인쇄 전용 스타일 (화면에는 안 보임) */
+        /* 인쇄 전용 영역 설정 */
         #print-section { display: none; }
+
         @media print {
+            /* 인쇄 시 화면의 모든 요소를 숨김 */
             body * { display: none !important; }
-            #print-section { display: block !important; width: 100%; padding: 0; margin: 0; }
+            /* 인쇄 영역만 강제로 표시 */
+            #print-section, #print-section * { display: block !important; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; }
+            
             .print-ticket { 
-                border: 2px solid #000; padding: 20px; width: 300px; text-align: center; margin: 0 auto;
-                page-break-inside: avoid;
+                width: 350px; margin: 20px auto; border: 2px solid #000; padding: 25px; 
+                box-sizing: border-box; text-align: center; background: white;
             }
-            .print-qr { width: 200px; height: 200px; margin-bottom: 10px; }
-            .print-info { text-align: left; font-size: 14px; line-height: 1.6; border-top: 1px solid #000; padding-top: 10px; }
-            .print-label { font-weight: bold; width: 80px; display: inline-block; }
+            .print-qr-img { width: 220px; height: 220px; margin: 15px 0; }
+            .print-info { text-align: left; font-size: 15px; line-height: 1.8; border-top: 1.5px solid #000; padding-top: 15px; }
+            .print-label { font-weight: bold; width: 85px; display: inline-block; }
+            .print-footer { font-size: 11px; color: #555; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; }
         }
     </style>
 </head>
@@ -48,7 +55,8 @@
             </tr>
         </thead>
         <tbody id="admin-table-body">
-            </tbody>
+            <tr><td colspan="6" style="text-align:center; padding:50px;">데이터를 불러오는 중...</td></tr>
+        </tbody>
     </table>
 </div>
 
@@ -65,53 +73,58 @@
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) { alert('로드 실패: ' + error.message); return; }
+        if (error) { alert('데이터 로드 실패: ' + error.message); return; }
 
         const tableBody = document.getElementById('admin-table-body');
+        if (data.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:50px;">내역이 없습니다.</td></tr>';
+            return;
+        }
+
         tableBody.innerHTML = data.map(item => `
             <tr>
                 <td>
                     <img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}">
                 </td>
-                <td style="font-family: monospace; font-weight: bold;">${item.차대번호 || '-'}</td>
+                <td style="font-family: 'Courier New', monospace; font-weight: bold; font-size: 15px;">${item.차대번호 || '-'}</td>
                 <td>
-                    <div style="font-weight: 600;">${item.품번}</div>
-                    <div style="font-size: 12px; color: #666;">${item.품명}</div>
+                    <div style="font-weight: 600; color: #2c3e50;">${item.품번}</div>
+                    <div style="font-size: 12px; color: #7f8c8d;">${item.품명}</div>
                 </td>
                 <td>${item.교환일}</td>
                 <td>${item.작업자}</td>
                 <td>
-                    <button class="btn-row-print" onclick='printSingleItem(${JSON.stringify(item)})'>개별 인쇄</button>
+                    <button class="btn-row-print" onclick='preparePrint(${JSON.stringify(item)})'>개별 인쇄</button>
                 </td>
             </tr>
         `).join('');
     }
 
-    // 개별 인쇄 함수
-    function printSingleItem(item) {
+    // 인쇄 준비 및 실행 함수
+    function preparePrint(item) {
         const printSection = document.getElementById('print-section');
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
         
+        // 1. 인쇄용 내용 생성
         printSection.innerHTML = `
             <div class="print-ticket">
-                <h2 style="margin-top:0;">고품 반납표</h2>
-                <img src="${qrUrl}" class="print-qr">
+                <h2 style="margin:0; letter-spacing: 2px;">고품 반납표</h2>
+                <img src="${qrUrl}" class="print-qr-img" id="target-qr">
                 <div class="print-info">
-                    <div><span class="print-label">차대번호:</span> ${item.차대번호}</div>
+                    <div><span class="print-label">차대번호:</span> <strong>${item.차대번호 || '-'}</strong></div>
                     <div><span class="print-label">품번:</span> ${item.품번}</div>
                     <div><span class="print-label">품명:</span> ${item.품명}</div>
                     <div><span class="print-label">교환일:</span> ${item.교환일}</div>
                     <div><span class="print-label">작업자:</span> ${item.작업자}</div>
                     <div><span class="print-label">수리항목:</span> ${item.수리항목 || '-'}</div>
                 </div>
-                <p style="font-size:10px; margin-top:15px; border-top:1px dashed #ccc;">* 본 고품은 BMW 규정에 따라 관리됩니다.</p>
+                <div class="print-footer">
+                    * 본 고품은 BMW 규정에 따라 엄격히 관리됩니다.
+                </div>
             </div>
         `;
-        
-        window.print();
-    }
 
-    fetchAdminData();
-</script>
-</body>
-</html>
+        // 2. 이미지 로딩 완료 체크
+        const img = document.getElementById('target-qr');
+        
+        // 이미지가 이미 캐시되어 있는
