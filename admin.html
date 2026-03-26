@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        /* [기본 UI 스타일] */
+        /* [UI 스타일 - 기존 유지] */
         :root { --primary-color: #1c69d4; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-main: #262626; --text-sub: #666666; --accent-red: #d12a2a; }
         body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 40px 20px; margin: 0; }
         .admin-container { max-width: 1300px; margin: 0 auto; }
@@ -31,11 +31,11 @@
         .qr-thumb { width: 48px; height: 48px; border-radius: 6px; border: 1px solid #eee; }
         .worker-badge { background: #eef2f7; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
 
-        /* 🔥 [핵심] 인쇄 여백 제로 및 레이아웃 최적화 설정 */
+        /* 🔥 [핵심] 인쇄 여백 제거 및 가로형 콤팩트 레이아웃 설정 */
         @media print {
             @page {
-                margin: 0; /* 브라우저 강제 여백 완전 제거 */
-                size: auto;
+                margin: 0; /* 브라우저 강제 여백 제거 */
+                size: auto; /* 라벨지 규격에 맞춰 자동 조정 */
             }
             body { margin: 0; padding: 0; background: #fff; }
             body * { display: none !important; }
@@ -48,22 +48,54 @@
             }
             
             .print-card { 
-                /* 라벨 너비에 맞춰 자동 조절되도록 설정 */
+                /* 라벨 너비에 맞춰 자동 조절되도록 너비는 100%로 설정 */
                 width: 100%; 
                 margin: 0;
-                padding: 5mm; 
+                padding: 5mm; /* 라벨지 안쪽 최소 여백 */
                 border: 4px solid #000; 
                 box-sizing: border-box;
+                display: flex; /* 가로 배열 (그림 예시) */
+                align-items: flex-start;
+                gap: 15px;
                 page-break-after: always;
                 font-family: 'Noto Sans KR', sans-serif;
             }
-            .label-header { background: #000; color: #fff; padding: 12px; text-align: center; font-size: 24px; font-weight: 900; }
-            .label-body { display: flex; border-bottom: 3px solid #000; }
-            .label-qr { width: 40%; padding: 15px; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; }
-            .label-qr img { width: 100%; height: auto; max-width: 150px; }
-            .label-info { flex: 1; padding: 15px; font-size: 18px; line-height: 1.8; font-weight: 600; }
-            .label-footer { padding: 20px; text-align: center; }
-            .big-text { font-size: 30px; font-weight: 900; display: block; margin-top: 8px; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+
+            .label-qr {
+                width: 35%; /* QR 비율 */
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .label-qr img { width: 100%; height: auto; max-width: 140px; }
+            .label-title { font-size: 14px; font-weight: bold; color: #555; margin-top: 5px; }
+
+            .label-info {
+                flex: 1; /* 나머지 공간 차지 */
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                line-height: 1.5;
+                padding-top: 5px;
+            }
+
+            .label-info div { border-bottom: 1px dashed #ccc; padding-bottom: 2px; }
+
+            /* 핵심 정보 강조 */
+            .part-num-vin {
+                margin-top: 10px;
+                border-top: 2px solid #000;
+                padding-top: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+            .big-label { font-size: 12px; font-weight: bold; color: #333; text-transform: uppercase; }
+            .big-text { font-size: 26px; font-weight: 900; display: block; font-family: 'JetBrains Mono', monospace; }
         }
         #print-section { display: none; }
     </style>
@@ -133,8 +165,10 @@
         let query = sb.from('qr_returns').select('*');
         if (start) query = query.gte('교환일', start);
         if (end) query = query.lte('교환일', end);
+        
         const { data, error } = await query.order('교환일', { ascending: isAsc });
-        if (error) return alert("Error: " + error.message);
+        if (error) return alert("에러: " + error.message);
+        
         fetchedData = data;
         renderTable(data);
     }
@@ -168,21 +202,17 @@
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
         return `
             <div class="print-card">
-                <div class="label-header">고품 반납 송장</div>
-                <div class="label-body">
-                    <div class="label-qr"><img src="${qrUrl}"></div>
-                    <div class="label-info">
-                        <div><b>교환일:</b> ${item.교환일}</div>
-                        <div><b>작업자:</b> ${item.작업자}</div>
-                        <div style="border:none;"><b>품명:</b> ${item.품명}</div>
-                    </div>
+                <div class="label-qr">
+                    <img src="${qrUrl}">
+                    <div class="label-title">고품 반납 송장</div>
                 </div>
-                <div class="label-footer">
-                    <span style="font-size:13px; font-weight:bold;">PART NUMBER</span>
-                    <span class="big-text">${item.품번}</span>
-                    <div style="margin-top:15px; border-top:2px solid #000; padding-top:10px;">
-                        <span style="font-size:13px; font-weight:bold;">VIN (LAST 7)</span>
-                        <span class="big-text">${item.차대번호.slice(-7)}</span>
+                <div class="label-info">
+                    <div><b>교환일:</b> ${item.교환일}</div>
+                    <div><b>작업자:</b> ${item.작업자}</div>
+                    <div style="border:none;"><b>품명:</b> ${item.품명}</div>
+                    <div class="part-num-vin">
+                        <span class="big-label">Part Number</span><span class="big-text">${item.품번}</span>
+                        <span class="big-label">VIN (Last 7)</span><span class="big-text">${item.차대번호.slice(-7)}</span>
                     </div>
                 </div>
             </div>`;
@@ -207,7 +237,7 @@
         if(ids.length > 0 && confirm("삭제하시겠습니까?")) { await sb.from('qr_returns').delete().in('id', ids); loadData(); }
     }
     function downloadExcel() {
-        const ws = XLSX.utils.json_to_sheet(fetchedData.map(i => ({ "날짜": i.교환일, "VIN": i.차대번호, "품번": i.품번, "품명": i.품명, "작업자": i.작업자 })));
+        const ws = XLSX.utils.json_to_sheet(fetchedData.map(i => ({ "날짜": i.교환일, "차대번호": i.차대번호, "품번": i.품번, "품명": i.품명, "작업자": i.작업자 })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "List");
         XLSX.writeFile(wb, `Warranty_Returns_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
