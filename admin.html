@@ -9,9 +9,14 @@
     <style>
         body { font-family: -apple-system, sans-serif; background: #f8f9fa; padding: 20px; margin: 0; }
         .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        h1 { font-size: 22px; margin: 0; border-left: 5px solid #3ecf8e; padding-left: 15px; }
+        .header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        h1 { font-size: 22px; margin: 0; border-left: 5px solid #3ecf8e; padding-left: 15px; width: 100%; margin-bottom: 15px; }
         
+        /* 날짜 필터 스타일 */
+        .filter-group { display: flex; align-items: center; gap: 10px; background: #f1f3f5; padding: 10px 15px; border-radius: 8px; font-size: 14px; }
+        .filter-group input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+        .btn-search { background: #495057; color: white; padding: 7px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
         .btn-group { display: flex; gap: 8px; }
         .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
         .btn-excel { background: #1d6f42; color: white; }
@@ -27,7 +32,6 @@
         .qr-thumb { width: 45px; height: 45px; border: 1px solid #ddd; border-radius: 4px; }
         input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
         
-        #print-section { display: none; }
         @media print {
             body * { display: none !important; }
             #print-section, #print-section * { display: block !important; }
@@ -37,6 +41,7 @@
             .info-box { text-align: left; font-size: 14px; line-height: 1.8; border-top: 1px solid #000; padding-top: 10px; }
             .info-label { font-weight: bold; width: 70px; display: inline-block; }
         }
+        #print-section { display: none; }
     </style>
 </head>
 <body>
@@ -44,6 +49,15 @@
 <div class="admin-container">
     <div class="header-flex">
         <h1>📦 고품 반납 관리 리스트</h1>
+        
+        <div class="filter-group">
+            <label>📅 조회 기간:</label>
+            <input type="date" id="start-date">
+            <span>~</span>
+            <input type="date" id="end-date">
+            <button class="btn-search" onclick="loadData()">조회</button>
+        </div>
+
         <div class="btn-group">
             <button class="btn btn-excel" onclick="downloadExcel()">📊 엑셀</button>
             <button class="btn btn-multi-print" onclick="printSelected()">🖨️ 선택 인쇄</button>
@@ -58,7 +72,7 @@
                 <th>QR</th>
                 <th>차대번호</th>
                 <th>품번 / 품명</th>
-                <th>교환일 ↓</th>
+                <th style="cursor:pointer" onclick="changeSort()">교환일 <span id="sort-icon">↓</span></th>
                 <th>작업자</th>
                 <th>기능</th>
             </tr>
@@ -76,13 +90,28 @@
     const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let fetchedData = [];
+    let isAsc = false;
+
+    // 기본 날짜 설정 (최근 일주일)
+    window.onload = () => {
+        const today = new Date().toISOString().split('T')[0];
+        const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        document.getElementById('start-date').value = lastWeek;
+        document.getElementById('end-date').value = today;
+        loadData();
+    };
 
     async function loadData() {
-        // 교환일(최신순) -> 등록일(최신순) 정렬
-        const { data, error } = await sb.from('qr_returns')
-            .select('*')
-            .order('교환일', { ascending: false })
-            .order('created_at', { ascending: false });
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        
+        let query = sb.from('qr_returns').select('*');
+        
+        // 날짜 필터 적용
+        if (start) query = query.gte('교환일', start);
+        if (end) query = query.lte('교환일', end);
+        
+        const { data, error } = await query.order('교환일', { ascending: isAsc });
 
         if (error) { alert("로드 에러: " + error.message); return; }
 
@@ -90,7 +119,7 @@
         const tbody = document.getElementById('table-body');
         
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">데이터가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">해당 기간에 데이터가 없습니다.</td></tr>';
             return;
         }
 
@@ -110,23 +139,25 @@
         `).join('');
     }
 
-    // 체크박스 전체 선택/해제
+    function changeSort() {
+        isAsc = !isAsc;
+        document.getElementById('sort-icon').innerText = isAsc ? '↑' : '↓';
+        loadData();
+    }
+
     function toggleAll(source) {
         const checkboxes = document.querySelectorAll('.row-check');
         checkboxes.forEach(cb => cb.checked = source.checked);
     }
 
-    // 선택된 데이터 가져오기 전용 함수
     function getSelectedItems() {
         const selectedIds = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
         return fetchedData.filter(item => selectedIds.includes(item.id));
     }
 
-    // 선택 인쇄 실행
     function printSelected() {
         const selected = getSelectedItems();
         if (selected.length === 0) return alert("인쇄할 항목을 선택해 주세요.");
-        
         const area = document.getElementById('print-section');
         area.innerHTML = selected.map(item => `
             <div class="print-card">
@@ -141,27 +172,28 @@
                 </div>
             </div>
         `).join('');
-
         setTimeout(() => { window.print(); }, 500);
     }
 
-    // 선택 삭제 실행
     async function deleteSelected() {
         const selectedIds = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
         if (selectedIds.length === 0) return alert("삭제할 항목을 선택해 주세요.");
         if (!confirm(`선택한 ${selectedIds.length}개의 항목을 삭제하시겠습니까?`)) return;
-
         const { error } = await sb.from('qr_returns').delete().in('id', selectedIds);
-        if (error) { alert("삭제 실패: " + error.message); }
-        else { alert("삭제 완료"); loadData(); }
+        if (error) alert("삭제 실패"); else loadData();
     }
 
-    // 단일 인쇄/삭제 함수 (기존과 동일)
     function doPrintSingle(item) {
+        const area = document.getElementById('print-section');
+        area.innerHTML = `<div class="print-card">...내용 동일...</div>`; // (중복이라 생략, 위 로직과 동일)
+        doPrintSingleRaw(item);
+    }
+    
+    function doPrintSingleRaw(item) {
         const area = document.getElementById('print-section');
         area.innerHTML = `
             <div class="print-card">
-                <h2>고품 반납표</h2>
+                <h2 style="margin:0">고품 반납표</h2>
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}" class="print-qr-img">
                 <div class="info-box">
                     <div><span class="info-label">차대번호:</span> ${item.차대번호}</div>
@@ -188,10 +220,8 @@
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "고품리스트");
-        XLSX.writeFile(wb, `고품반납_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.writeFile(wb, `고품반납_${document.getElementById('start-date').value}_${document.getElementById('end-date').value}.xlsx`);
     }
-
-    loadData();
 </script>
 </body>
 </html>
