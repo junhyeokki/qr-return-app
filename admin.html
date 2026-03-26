@@ -3,216 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMW Warranty Admin - Final</title>
+    <title>BMW Warranty Admin - Final Fix</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=JetBrains+Mono:wght@800&display=swap" rel="stylesheet">
     <style>
-        /* [1. 관리 화면 스타일] */
-        :root { --primary: #1c69d4; --bg: #f4f7f9; --accent-red: #e74c3c; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .admin-container { max-width: 1300px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        /* [관리 화면 디자인] image_df5da6 기준 */
+        :root { --primary: #3b82f6; --success: #22c55e; --danger: #ef4444; --bg: #f8fafc; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
+        .admin-box { max-width: 1200px; margin: 0 auto; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
-        .top-btns { display: flex; gap: 8px; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .btn-group { display: flex; gap: 8px; }
         
-        .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .filter-bar input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; color: #666; }
-        td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: middle; }
-        
-        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
-        .btn-excel { background: #157347; color: white; }
-        .btn-sel-print { background: var(--primary); color: white; }
-        .btn-delete-all { background: #fee; color: var(--accent-red); border: 1px solid #fcc; }
-        
-        /* 리스트 내 버튼 */
-        .row-btn-group { display: flex; gap: 5px; }
-        .btn-mini { padding: 5px 10px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-mini-print { background: #333; color: white; }
-        .btn-mini-del { background: var(--accent-red); color: white; }
+        .btn { border: none; padding: 8px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; transition: 0.2s; }
+        .btn-excel { background: #065f46; color: white; }
+        .btn-merge { background: var(--success); color: white; }
+        .btn-delete { background: #fee2e2; color: var(--danger); }
+        .btn-query { background: var(--primary); color: white; }
 
-        .qr-thumb { width: 45px; height: 45px; border: 1px solid #eee; border-radius: 4px; }
+        .search-bar { background: #f1f5f9; padding: 16px; border-radius: 8px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px; font-size: 14px; }
+        .search-bar input { border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; }
 
-        /* [2. 인쇄 레이아웃] 매니저님 손그림(image_ddf1ea) 반영 */
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; }
+        .qr-img { width: 40px; height: 40px; border-radius: 4px; border: 1px solid #e2e8f0; }
+
+        /* [인쇄 레이아웃] image_ddf1ea(가로형) 반영 */
         @media print {
-            @page { margin: 0; size: auto; }
+            @page { size: auto; margin: 0; }
             body * { display: none !important; }
             #print-area, #print-area * { display: block !important; }
+            #print-area { width: 100%; padding: 10px; }
             
-            #print-area { width: 100%; }
             .label-card {
-                display: flex !important;
+                display: flex !important; /* 가로 배치 */
                 flex-direction: row !important;
-                width: 120mm !important; /* 틀에서 안 넘치도록 가로 폭 조정 */
-                height: 50mm !important;
+                width: 105mm !important; /* 라벨 폭에 맞춤 */
+                height: 48mm !important;
                 border: 2px solid #000;
-                padding: 4mm !important;
-                margin: 0 auto 5mm auto;
+                margin-bottom: 5mm;
+                padding: 3mm !important;
                 box-sizing: border-box;
                 page-break-after: always;
                 align-items: center;
-                gap: 15px;
             }
-            .qr-side { width: 35mm !important; flex-shrink: 0; }
-            .qr-side img { width: 100%; height: auto; display: block; }
+            .label-qr { width: 32mm !important; margin-right: 5mm; flex-shrink: 0; }
+            .label-qr img { width: 100%; display: block; }
             
-            .info-side { flex-grow: 1; display: flex !important; flex-direction: column !important; overflow: hidden; }
-            .line { font-size: 13px; font-weight: 700; line-height: 1.4; color: #000; }
+            .label-info { flex-grow: 1; display: flex !important; flex-direction: column !important; justify-content: center; overflow: hidden; }
+            .info-text { font-size: 12px; font-weight: 700; line-height: 1.5; color: #000; }
             
-            .data-box { 
-                margin-top: 6px; padding-top: 6px; border-top: 2px solid #000; 
-                display: flex !important; flex-wrap: wrap; gap: 15px; 
-            }
-            .val-group { display: flex; flex-direction: column; }
-            .val-label { font-size: 10px; color: #444; font-weight: bold; }
-            .val-text { font-family: 'JetBrains Mono'; font-size: 20px; font-weight: 800; line-height: 1.1; color: #000; }
+            .data-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid #000; }
+            .data-label { font-size: 9px; color: #333; font-weight: 700; display: block; margin-top: 2px; }
+            .data-value { font-family: 'JetBrains Mono'; font-size: 18px; font-weight: 800; line-height: 1; color: #000; display: block; }
         }
         #print-area { display: none; }
     </style>
 </head>
 <body>
 
-<div class="admin-container">
-    <div class="header">
-        <h2 style="margin:0;">📦 고품 반납 관리 리스트</h2>
-        <div class="top-btns">
+<div class="admin-box">
+    <div class="header-row">
+        <h2 style="margin:0; display:flex; align-items:center; gap:8px;">📦 고품 반납 관리 리스트</h2>
+        <div class="btn-group">
             <button class="btn btn-excel" onclick="exportExcel()">📊 엑셀 내보내기</button>
-            <button class="btn btn-sel-print" onclick="printSelected()">🖨️ 선택 인쇄</button>
-            <button class="btn btn-delete-all" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+            <button class="btn btn-merge" onclick="printSelected()">📄 병합 인쇄</button>
+            <button class="btn btn-delete" onclick="deleteSelected()">🗑️ 선택 삭제</button>
         </div>
     </div>
 
-    <div class="filter-bar">
+    <div class="search-bar">
         <span>조회 기간:</span>
-        <input type="date" id="startDate">
+        <input type="date" id="start-date">
         <span>~</span>
-        <input type="date" id="endDate">
-        <button class="btn btn-sel-print" style="background:#333;" onclick="fetchData()">조회하기</button>
+        <input type="date" id="end-date">
+        <button class="btn btn-query" onclick="loadData()">조회하기</button>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
+                <th style="width:40px;"><input type="checkbox" onclick="checkAll(this)"></th>
                 <th>QR</th>
-                <th>차대번호 (VIN)</th>
-                <th>부품 정보</th>
+                <th>차대번호</th>
+                <th>품번 / 품명</th>
                 <th>교환일</th>
                 <th>작업자</th>
                 <th style="text-align:center;">기능</th>
             </tr>
         </thead>
-        <tbody id="list-body"></tbody>
+        <tbody id="data-list"></tbody>
     </table>
 </div>
 
 <div id="print-area"></div>
 
 <script>
-    const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let masterData = [];
+    const SURL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
+    const SKEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
+    const client = window.supabase.createClient(SURL, SKEY);
+    let currentData = [];
 
     window.onload = () => {
-        const now = new Date();
-        const before = new Date();
-        before.setDate(now.getDate() - 14);
-        document.getElementById('endDate').value = now.toISOString().split('T')[0];
-        document.getElementById('startDate').value = before.toISOString().split('T')[0];
-        fetchData();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('end-date').value = today;
+        loadData();
     };
 
-    async function fetchData() {
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-        let query = sb.from('qr_returns').select('*').order('교환일', { ascending: false });
-        if(start) query = query.gte('교환일', start);
-        if(end) query = query.lte('교환일', end);
-
-        const { data } = await query;
-        masterData = data;
-        render(data);
-    }
-
-    function render(data) {
-        document.getElementById('list-body').innerHTML = data.map(item => `
+    async function loadData() {
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        let q = client.from('qr_returns').select('*').order('교환일', { ascending: false });
+        if(start) q = q.gte('교환일', start);
+        if(end) q = q.lte('교환일', end);
+        
+        const { data } = await q;
+        currentData = data || [];
+        const html = currentData.map(item => `
             <tr>
-                <td><input type="checkbox" class="row-check" value="${item.id}"></td>
-                <td><img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
-                <td style="font-family:'JetBrains Mono'; font-weight:700; color:#1c69d4;">${item.차대번호}</td>
-                <td><b>${item.품번}</b><br><small style="color:#666;">${item.품명}</small></td>
+                <td><input type="checkbox" class="item-chk" value="${item.id}"></td>
+                <td><img class="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
+                <td style="font-family:'JetBrains Mono'; font-weight:700; color:#2563eb;">${item.차대번호}</td>
+                <td><strong>${item.품번}</strong><br><small style="color:#64748b;">${item.품명}</small></td>
                 <td>${item.교환일}</td>
                 <td>${item.작업자}</td>
                 <td style="text-align:center;">
-                    <div class="row-btn-group">
-                        <button class="btn-mini btn-mini-print" onclick="printOne('${item.id}')">인쇄</button>
-                        <button class="btn-mini btn-mini-del" onclick="deleteItem('${item.id}')">삭제</button>
-                    </div>
+                    <button class="btn" style="background:#334155; color:white; padding:4px 8px; font-size:11px;" onclick="printOne('${item.id}')">인쇄</button>
                 </td>
             </tr>
         `).join('');
+        document.getElementById('data-list').innerHTML = html;
     }
 
-    function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
+    function checkAll(src) { document.querySelectorAll('.item-chk').forEach(c => c.checked = src.checked); }
 
-    // 라벨 HTML 생성 함수 (가로형 레이아웃)
-    function makeLabelHtml(item) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+    // 라벨 생성 (QR 좌측, 정보 우측 배치)
+    function buildLabel(item) {
+        const qrPath = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
         return `
             <div class="label-card">
-                <div class="qr-side"><img src="${qrUrl}"></div>
-                <div class="info-side">
-                    <div class="line">교환일: ${item.교환일}</div>
-                    <div class="line">작업자: ${item.작업자}</div>
-                    <div class="line" style="white-space:nowrap; overflow:hidden;">품명: ${item.품명}</div>
-                    <div class="data-box">
-                        <div class="val-group">
-                            <span class="val-label">PART NUMBER</span>
-                            <span class="val-text">${item.품번}</span>
-                        </div>
-                        <div class="val-group">
-                            <span class="val-label">VIN (LAST 7)</span>
-                            <span class="val-text">${item.차대번호.slice(-7)}</span>
-                        </div>
+                <div class="label-qr"><img src="${qrPath}"></div>
+                <div class="label-info">
+                    <div class="info-text">교환일: ${item.교환일}</div>
+                    <div class="info-text">작업자: ${item.작업자}</div>
+                    <div class="info-text" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">품명: ${item.품명}</div>
+                    <div class="data-section">
+                        <span class="data-label">PART NUMBER</span>
+                        <span class="data-value">${item.품번}</span>
+                        <span class="data-label">VIN (LAST 7)</span>
+                        <span class="data-value">${item.차대번호.slice(-7)}</span>
                     </div>
                 </div>
             </div>`;
     }
 
     function printOne(id) {
-        const item = masterData.find(i => String(i.id) === String(id));
-        document.getElementById('print-area').innerHTML = makeLabelHtml(item);
-        setTimeout(() => { window.print(); }, 300);
+        const item = currentData.find(d => String(d.id) === String(id));
+        document.getElementById('print-area').innerHTML = buildLabel(item);
+        setTimeout(() => window.print(), 300);
     }
 
     function printSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
-        if(ids.length === 0) return alert("선택된 항목이 없습니다.");
-        const targets = masterData.filter(i => ids.includes(String(i.id)));
-        document.getElementById('print-area').innerHTML = targets.map(t => makeLabelHtml(t)).join('');
-        setTimeout(() => { window.print(); }, 500);
-    }
-
-    async function deleteItem(id) {
-        if(!confirm("정말 삭제하시겠습니까?")) return;
-        await sb.from('qr_returns').delete().eq('id', id);
-        fetchData();
+        const checkedIds = Array.from(document.querySelectorAll('.item-chk:checked')).map(c => c.value);
+        if(!checkedIds.length) return alert("선택된 항목이 없습니다.");
+        const targets = currentData.filter(d => checkedIds.includes(String(d.id)));
+        document.getElementById('print-area').innerHTML = targets.map(t => buildLabel(t)).join('');
+        setTimeout(() => window.print(), 500);
     }
 
     async function deleteSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
-        if(ids.length === 0) return alert("선택된 항목이 없습니다.");
-        if(!confirm(`선택한 ${ids.length}건을 삭제하시겠습니까?`)) return;
-        await sb.from('qr_returns').delete().in('id', ids);
-        fetchData();
+        const ids = Array.from(document.querySelectorAll('.item-chk:checked')).map(c => c.value);
+        if(!ids.length || !confirm("정말 삭제하시겠습니까?")) return;
+        await client.from('qr_returns').delete().in('id', ids);
+        loadData();
     }
 
     function exportExcel() {
-        const ws = XLSX.utils.json_to_sheet(masterData);
+        const ws = XLSX.utils.json_to_sheet(currentData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Returns");
         XLSX.utils.writeFile(wb, `BMW_Returns_${new Date().toISOString().slice(0,10)}.xlsx`);
