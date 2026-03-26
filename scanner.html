@@ -29,4 +29,204 @@
         .result-card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         .result-header { border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 15px; }
         .part-name { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
-        .part-no { font-family: 'JetBrains Mono'; font-size: 24px; font-weight: 800;
+        .part-no { font-family: 'JetBrains Mono'; font-size: 24px; font-weight: 800; color: var(--primary); }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .info-label { color: #64748b; font-weight: bold; }
+        .info-val { color: #1e293b; font-weight: bold; text-align: right; }
+        .vin-text { font-family: 'JetBrains Mono'; color: #b91c1c; font-weight: 800; }
+
+        /* 하단 플로팅 버튼 */
+        .action-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.95); padding: 15px; box-sizing: border-box; display: flex; gap: 10px; border-top: 1px solid #e2e8f0; backdrop-filter: blur(5px); }
+        .btn-scan-again { flex: 1; background: #334155; color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        .btn-return-confirm { flex: 2; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        /* 로딩/에러 메시지 */
+        #status-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; z-index: 5; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .error-card { background: #fee2e2; border: 1px solid #fecaca; color: #b91c1c; padding: 15px; border-radius: 12px; text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="scan-header">
+    <h1>📲 반납 검수 스캐너</h1>
+    <span id="network-status" class="status-badge offline">연결 중...</span>
+</div>
+
+<div id="reader-container">
+    <div id="status-msg">카메라를 켜는 중입니다...</div>
+    <div id="reader"></div>
+</div>
+
+<div id="result-container">
+    <div id="data-area">
+        </div>
+
+    <div class="action-bar">
+        <button class="btn-scan-again" onclick="startScanner()">🔄 다시 스캔</button>
+        <button id="return-btn" class="btn-return-confirm" onclick="markAsReturned()" disabled>✅ 반납 완료 처리</button>
+    </div>
+</div>
+
+<script>
+    // Supabase 설정 (admin.html과 동일하게 설정)
+    const SURL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
+    const SKEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
+    const client = window.supabase.createClient(SURL, SKEY);
+
+    let html5QrCode;
+    let currentPartId = null;
+
+    // 초기 실행
+    window.onload = () => {
+        checkNetwork();
+        startScanner();
+    };
+
+    // 네트워크 상태 확인
+    function checkNetwork() {
+        const badge = document.getElementById('network-status');
+        if (navigator.onLine) {
+            badge.innerText = 'ONLINE';
+            badge.classList.add('online');
+        } else {
+            badge.innerText = 'OFFLINE';
+            badge.classList.remove('online');
+        }
+    }
+    window.addEventListener('online', checkNetwork);
+    window.addEventListener('offline', checkNetwork);
+
+    // 카메라 스캐너 시작
+    function startScanner() {
+        // 결과창 숨기고 카메라창 표시
+        document.getElementById('result-container').style.display = 'none';
+        document.getElementById('reader-container').style.display = 'block';
+        document.getElementById('status-msg').style.display = 'block';
+        document.getElementById('status-msg').innerText = '카메라 권한을 확인 중입니다...';
+
+        if(html5QrCode) { html5QrCode.stop(); } // 기존 스캐너 정지
+
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+        // 후면 카메라 우선 사용
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .then(() => {
+            document.getElementById('status-msg').style.display = 'none'; // 로딩 메시지 숨김
+        })
+        .catch(err => {
+            document.getElementById('status-msg').innerText = '❌ 카메라 에러: 권한을 허용해 주세요.';
+            console.error(err);
+        });
+    }
+
+    // 스캔 성공 시 실행
+    async function onScanSuccess(decodedText) {
+        // 스캐너 정지 (중복 스캔 방지)
+        html5QrCode.stop();
+        document.getElementById('status-msg').innerText = '🔍 정보를 조회 중입니다...';
+        document.getElementById('status-msg').style.display = 'block';
+
+        // QR 데이터 분석 (URL에서 ID 추출)
+        // 예: https://.../result.html?id=123
+        try {
+            const url = new URL(decodedText);
+            const id = url.searchParams.get("id");
+
+            if (!id) { throw new Error("ID 없음"); }
+            currentPartId = id;
+            await fetchAndRenderData(id); // 데이터 조회 및 렌더링
+        } catch (error) {
+            renderError("❌ 올바른 고품 QR 코드가 아닙니다.");
+        }
+    }
+
+    // Supabase에서 데이터 조회 및 화면 렌더링
+    async function fetchAndRenderData(id) {
+        const dataArea = document.getElementById('data-area');
+        const returnBtn = document.getElementById('return-btn');
+        
+        // 카메라창 숨기고 결과창 표시
+        document.getElementById('reader-container').style.display = 'none';
+        document.getElementById('result-container').style.display = 'block';
+
+        const { data, error } = await client.from('qr_returns').select('*').eq('id', id).single();
+
+        if (error || !data) {
+            renderError("❌ 등록되지 않은 고품입니다.");
+            returnBtn.disabled = true;
+            return;
+        }
+
+        // 정상 데이터 렌더링
+        // DB 필드명 불일치 방지 (admin.html 로직 적용)
+        const vin = data.차대번호 || data.vin || 'N/A';
+        const partNo = data.품번 || data.part_no || 'N/A';
+        const partName = data.품명 || data.part_name || '정보없음';
+        const worker = data.작업자 || data.worker || '미지정';
+        const date = data.교환일 || data.change_date || '-';
+
+        dataArea.innerHTML = `
+            <div class="result-card">
+                <div class="result-header">
+                    <div class="part-name">${partName}</div>
+                    <div class="part-no">${partNo}</div>
+                </div>
+                <div class="info-grid">
+                    <div class="info-row"><span class="info-label">VIN (Last 7)</span><span class="info-val vin-text">${vin.slice(-7)}</span></div>
+                    <div class="info-row"><span class="info-label">작업자</span><span class="info-val">${worker}</span></div>
+                    <div class="info-row"><span class="info-label">교환일</span><span class="info-val">${date}</span></div>
+                    <div class="info-row">
+                        <span class="info-label">현재 상태</span>
+                        <span class="info-val" style="color:${data.status === '반납완료' ? '#065f46' : '#b91c1c'};">
+                            ${data.status === '반납완료' ? '✅ 반납완료' : '🛑 반납대기'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 이미 반납 완료된 경우 버튼 비활성화
+        if (data.status === '반납완료') {
+            returnBtn.disabled = true;
+            returnBtn.innerText = '이미 반납되었습니다';
+            returnBtn.style.background = '#cbd5e1';
+        } else {
+            returnBtn.disabled = false;
+            returnBtn.innerText = '✅ 반납 완료 처리';
+            returnBtn.style.background = 'var(--primary)';
+        }
+    }
+
+    // 에러 메시지 표시
+    function renderError(msg) {
+        document.getElementById('reader-container').style.display = 'none';
+        document.getElementById('result-container').style.display = 'block';
+        document.getElementById('data-area').innerHTML = `<div class="error-card">${msg}</div>`;
+    }
+
+    // ✅ 반납 완료 처리 (DB 업데이트)
+    async function markAsReturned() {
+        if (!currentPartId) return;
+        if (!confirm("이 부품을 '반납완료' 상태로 변경하시겠습니까?")) return;
+
+        const returnBtn = document.getElementById('return-btn');
+        returnBtn.innerText = '⏳ 처리 중...';
+        returnBtn.disabled = true;
+
+        const { error } = await client.from('qr_returns').update({ status: '반납완료' }).eq('id', currentPartId);
+
+        if (error) {
+            alert("❌ 업데이트 실패: 네트워크 상태를 확인하세요.");
+            returnBtn.innerText = '✅ 반납 완료 처리';
+            returnBtn.disabled = false;
+        } else {
+            alert("✅ 반납 처리가 완료되었습니다.");
+            fetchAndRenderData(currentPartId); // 정보 새로고침
+        }
+    }
+</script>
+</body>
+</html>
