@@ -17,17 +17,17 @@
         .btn { padding: 10px 18px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; font-size: 14px; }
         .btn-excel { background: #157347; color: white; }
         .btn-print-main { background: var(--primary); color: white; }
-        .btn-match { background: var(--success); color: white; padding: 6px 12px; font-size: 13px; border-radius: 20px; }
-        .btn-del { background: #fff1f1; color: var(--danger); border: 1px solid #ffebeb; padding: 5px 10px; border-radius: 4px; font-size: 12px; }
-        .btn-row-print { background: #f8f9fa; color: #334155; border: 1px solid #e2e8f0; padding: 5px 10px; border-radius: 4px; font-size: 12px; }
+        .btn-match { background: var(--success); color: white; padding: 6px 12px; font-size: 13px; border-radius: 20px; border: none; cursor: pointer; }
+        .btn-del { background: #fff1f1; color: var(--danger); border: 1px solid #ffebeb; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .btn-row-print { background: #f8f9fa; color: #334155; border: 1px solid #e2e8f0; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
         .filter-bar { display: flex; align-items: center; gap: 12px; background: #f0f4f8; padding: 15px 20px; border-radius: 10px; margin-bottom: 25px; font-size: 14px; }
         .filter-bar input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
         table { width: 100%; border-collapse: collapse; }
         th { padding: 15px; text-align: left; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; text-transform: uppercase; }
         td { padding: 18px 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
 
-        /* 상태 표시 태그 */
-        .status-tag { font-weight: 800; color: var(--success); background: #f0fdf4; padding: 4px 10px; border-radius: 15px; font-size: 12px; margin-left: 8px; white-space: nowrap; }
+        /* 상태 표시 태그 - 더 명확하게 디자인 */
+        .status-tag { font-weight: 800; color: #157347; background: #d1e7dd; padding: 6px 14px; border-radius: 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #badbcc; }
 
         @media print {
             @page { size: A4; margin: 0; }
@@ -110,10 +110,10 @@
                 <td style="font-family:'JetBrains Mono'; font-weight:700; color:var(--primary);">${item.차대번호}</td>
                 <td><strong>${item.품번}</strong><br><span style="font-size:12px; color:#64748b;">${item.품명}</span></td>
                 <td>
-                    <div style="display:flex; align-items:center;">
-                        <button class="btn btn-match" onclick="startIntegratedScan('${item.id}', '${item.차대번호}', '${item.품번}')">🔗 출고서 매칭</button>
-                        ${item.bmw_qr_code ? `<span class="status-tag">✅ 수거 완료</span>` : ''}
-                    </div>
+                    ${item.bmw_qr_code 
+                        ? `<span class="status-tag">✅ 수거 완료</span>` 
+                        : `<button class="btn btn-match" onclick="startIntegratedScan('${item.id}', '${item.차대번호}', '${item.품번}')">🔗 출고서 매칭</button>`
+                    }
                 </td>
                 <td>
                     <div style="display:flex; gap:8px;">
@@ -139,14 +139,20 @@
             const isPartMatch = originPart.replace(/[^a-zA-Z0-9]/g, '') === scPart.replace(/[^a-zA-Z0-9]/g, '');
 
             if (isVinMatch && isPartMatch) {
-                if(confirm(`[판독 결과: 일치]\n차대: ${scVin}\n품번: ${scPart}\n수거 완료 처리하시겠습니까?`)) {
-                    await sb.from('qr_returns').update({ 
+                if(confirm(`[판독 결과: 일치]\n수거 완료 처리하시겠습니까?`)) {
+                    const { error } = await sb.from('qr_returns').update({ 
                         bmw_qr_code: decodedText,
                         차대번호: scVin,
                         품번: scPart,
                         교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`
                     }).eq('id', id);
-                    closeScanner(); fetchData();
+
+                    if(error) {
+                        alert("업데이트 실패: " + error.message);
+                    } else {
+                        closeScanner();
+                        await fetchData(); // 최신 데이터 다시 로드 및 리스트 재생성
+                    }
                 }
             } else {
                 alert(`⚠️ 정보 불일치!\n기존: ${originVin} / ${originPart}\n스캔: ${scVin} / ${scPart}`);
@@ -191,7 +197,16 @@
         return `<div class="label-card"><div class="qr-side"><img src="${qrUrl}"></div><div class="info-side"><div style="font-size:12px; font-weight:700;">날짜: ${item.교환일} / 작업자: ${item.작업자}</div><div style="font-size:12px; font-weight:700; margin-top:2px;">품명: ${item.품명}</div><div class="data-box"><div style="font-size:9px; font-weight:bold;">PART NUMBER</div><div class="val-text">${item.품번}</div><div style="font-size:9px; font-weight:bold; margin-top:5px;">VIN (LAST 7)</div><div class="val-text">${item.차대번호.slice(-7)}</div></div></div></div>`;
     }
 
-    function closeScanner() { if(html5QrCode) html5QrCode.stop().then(() => document.getElementById('scanner-modal').style.display='none'); }
+    function closeScanner() { 
+        if(html5QrCode) {
+            html5QrCode.stop().then(() => {
+                document.getElementById('scanner-modal').style.display='none';
+                html5QrCode = null;
+            }).catch(err => console.error(err));
+        } else {
+            document.getElementById('scanner-modal').style.display='none';
+        }
+    }
     function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
     async function deleteItem(id) { if(confirm("정말 삭제하시겠습니까?")) { await sb.from('qr_returns').delete().eq('id', id); fetchData(); } }
 </script>
