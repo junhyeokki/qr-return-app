@@ -3,69 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMW Warranty Admin - Final Print System</title>
+    <title>BMW Warranty Admin - Ultimate System</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=JetBrains+Mono:wght@800&display=swap" rel="stylesheet">
     <style>
-        /* [1. 관리 화면 스타일] */
-        :root { --primary: #1c69d4; --bg: #f4f7f9; --accent-red: #e74c3c; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 20 : 0px; }
+        :root { --primary: #1c69d4; --bg: #f4f7f9; --accent-red: #e74c3c; --success: #27ae60; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
         .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
         .top-btns { display: flex; gap: 8px; }
-        .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .filter-bar input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; }
+        
+        /* 테이블 스타일 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; color: #666; }
         td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
         
-        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        /* 버튼 스타일 */
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .btn-scan { background: #000; color: white; }
         .btn-excel { background: #157347; color: white; }
         .btn-sel-print { background: var(--primary); color: white; }
-        .btn-delete-all { background: #fee; color: var(--accent-red); border: 1px solid #fcc; }
-        
-        .row-btn-group { display: flex; gap: 5px; }
-        .btn-mini { padding: 5px 10px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-mini-print { background: #333; color: white; }
-        .btn-mini-del { background: var(--accent-red); color: white; }
-        .qr-thumb { width: 45px; height: 45px; border: 1px solid #eee; }
+        .btn-delete { background: var(--accent-red); color: white; }
+        .btn-match { background: var(--success); color: white; padding: 4px 8px; font-size: 11px; }
 
-        /* [2. 인쇄 스타일] A4 8구(2열 4행) - image_dfc366 양식 준수 */
+        /* 스캐너 모달 */
+        #scanner-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        #reader { width: 450px; max-width: 90%; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+        .modal-info { color: white; margin-bottom: 15px; text-align: center; }
+
+        /* 인쇄 레이아웃 (A4 8구) */
         @media print {
             @page { size: A4; margin: 10mm; }
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
-            #print-area { 
-                position: absolute; left: 0; top: 0; width: 100%;
-                display: grid !important; 
-                grid-template-columns: 1fr 1fr; /* 2열 */
-                gap: 5mm; 
-            }
-            .label-card {
-                display: flex !important;
-                flex-direction: row !important;
-                border: 2px solid #000;
-                height: 65mm !important; /* 4행 배치를 위한 높이 */
-                padding: 4mm !important;
-                box-sizing: border-box;
-                align-items: center;
-                background: white;
-                page-break-inside: avoid;
-            }
-            .qr-side { width: 35% !important; flex-shrink: 0; border-right: 1.5px solid #000; padding-right: 4mm; height: 100%; display: flex; align-items: center; }
-            .qr-side img { width: 100%; height: auto; display: block; }
-            
-            .info-side { flex-grow: 1; padding-left: 5mm; display: flex !important; flex-direction: column !important; justify-content: center; }
-            .line { font-size: 12px; font-weight: 700; line-height: 1.5; color: #000; margin-bottom: 2px; }
-            
-            .data-box { 
-                margin-top: 8px; padding-top: 8px; border-top: 2px solid #000; 
-                display: flex !important; flex-direction: column !important; gap: 6px; 
-            }
-            .val-group { display: flex; flex-direction: column; }
-            .val-label { font-size: 9px; color: #333; font-weight: bold; margin-bottom: -1px; }
-            .val-text { font-family: 'JetBrains Mono'; font-size: 18px; font-weight: 800; color: #000; line-height: 1; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 5mm; }
+            .label-card { display: flex !important; border: 2px solid #000; height: 65mm; padding: 4mm; box-sizing: border-box; align-items: center; background: white; page-break-inside: avoid; }
+            .qr-side { width: 35%; border-right: 2px solid #000; padding-right: 4mm; }
+            .info-side { flex-grow: 1; padding-left: 5mm; }
+            .data-box { margin-top: 8px; padding-top: 8px; border-top: 2px solid #000; }
+            .val-text { font-family: 'JetBrains Mono'; font-size: 18px; font-weight: 800; color: #000; }
         }
         #print-area { display: none; }
     </style>
@@ -74,20 +53,12 @@
 
 <div class="admin-container">
     <div class="header">
-        <h2 style="margin:0;">📦 고품 반납 관리 리스트</h2>
+        <h2 style="margin:0;">📦 BMW 고품 반납 통합 관리</h2>
         <div class="top-btns">
-            <button class="btn btn-excel" onclick="exportExcel()">📊 엑셀 내보내기</button>
-            <button class="btn btn-sel-print" onclick="printSelected()">📄 병합 인쇄</button>
-            <button class="btn btn-delete-all" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+            <button class="btn btn-scan" onclick="openScanner('CHECK')">📱 검수 스캔</button>
+            <button class="btn btn-excel" onclick="exportExcel()">📊 엑셀 저장</button>
+            <button class="btn btn-sel-print" onclick="printSelected()">📄 병합 인쇄(8구)</button>
         </div>
-    </div>
-
-    <div class="filter-bar">
-        <span>조회 기간:</span>
-        <input type="date" id="startDate">
-        <span>~</span>
-        <input type="date" id="endDate">
-        <button class="btn btn-sel-print" style="background:#333;" onclick="fetchData()">조회하기</button>
     </div>
 
     <table>
@@ -95,42 +66,41 @@
             <tr>
                 <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
                 <th>QR</th>
-                <th>차대번호 (VIN)</th>
+                <th>차대번호</th>
                 <th>부품 정보</th>
-                <th>교환일</th>
-                <th>작업자</th>
-                <th style="text-align:center;">기능</th>
+                <th>교환일/작업자</th>
+                <th>출고서 매칭</th>
+                <th>기능</th>
             </tr>
         </thead>
         <tbody id="list-body"></tbody>
     </table>
 </div>
 
+<div id="scanner-modal">
+    <div class="modal-info">
+        <h3 id="modal-title">QR 코드를 스캔하세요</h3>
+        <p id="modal-desc">가이드 사각형 안에 QR을 맞춰주세요.</p>
+    </div>
+    <div id="reader"></div>
+    <button class="btn" style="margin-top:20px; background:white;" onclick="closeScanner()">❌ 닫기</button>
+</div>
+
 <div id="print-area"></div>
 
 <script>
-    const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SURL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
+    const SKEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
+    const sb = window.supabase.createClient(SURL, SKEY);
+    
     let masterData = [];
+    let html5QrCode;
+    let currentMatchId = null;
 
-    window.onload = () => {
-        const now = new Date();
-        const before = new Date();
-        before.setDate(now.getDate() - 14);
-        document.getElementById('endDate').value = now.toISOString().split('T')[0];
-        document.getElementById('startDate').value = before.toISOString().split('T')[0];
-        fetchData();
-    };
+    window.onload = fetchData;
 
     async function fetchData() {
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-        let query = sb.from('qr_returns').select('*').order('교환일', { ascending: false });
-        if(start) query = query.gte('교환일', start);
-        if(end) query = query.lte('교환일', end);
-        const { data, error } = await query;
-        if(error) return console.error(error);
+        const { data } = await sb.from('qr_returns').select('*').order('created_at', { ascending: false });
         masterData = data;
         render(data);
     }
@@ -139,90 +109,103 @@
         document.getElementById('list-body').innerHTML = data.map(item => `
             <tr>
                 <td><input type="checkbox" class="row-check" value="${item.id}"></td>
-                <td><img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
-                <td style="font-family:'JetBrains Mono'; font-weight:700; color:#1c69d4;">${item.차대번호 || item.vin}</td>
-                <td><b>${item.품번 || item.part_no}</b><br><small style="color:#666;">${item.품명 || item.part_name}</small></td>
-                <td>${item.교환일 || item.change_date}</td>
-                <td>${item.작업자 || item.worker}</td>
-                <td style="text-align:center;">
-                    <div class="row-btn-group">
-                        <button class="btn-mini btn-mini-print" onclick="printOne('${item.id}')">인쇄</button>
-                        <button class="btn-mini btn-mini-del" onclick="deleteItem('${item.id}')">삭제</button>
-                    </div>
+                <td><img style="width:45px;" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
+                <td style="font-family:'JetBrains Mono'; font-weight:700; color:#1c69d4;">${item.차대번호}</td>
+                <td><b>${item.품번}</b><br><small>${item.품명}</small></td>
+                <td>${item.교환일}<br><small>${item.작업자}</small></td>
+                <td>
+                    ${item.bmw_qr_code ? `<span style="color:green; font-weight:bold;">✅ 매칭완료<br><small>${item.bmw_qr_code}</small></span>` : 
+                    `<button class="btn btn-match" onclick="openScanner('MATCH', '${item.id}')">🔗 출고서 매칭</button>`}
+                </td>
+                <td>
+                    <button class="btn btn-delete" style="padding:4px 8px; font-size:11px;" onclick="deleteItem('${item.id}')">삭제</button>
                 </td>
             </tr>
         `).join('');
     }
 
-    function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
+    // 📱 통합 스캐너 오픈 (검수용 / 매칭용 공용)
+    function openScanner(mode, id = null) {
+        currentMatchId = id;
+        document.getElementById('scanner-modal').style.display = 'flex';
+        document.getElementById('modal-title').innerText = (mode === 'MATCH') ? "📋 순정 고품출고서 QR 스캔" : "🔍 부품 정보 조회 스캔";
+        
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, 
+            async (decodedText) => {
+                if(mode === 'MATCH') {
+                    // [핵심] 순정 QR 데이터 매칭 로직
+                    await matchBMWQR(currentMatchId, decodedText);
+                } else {
+                    // 일반 검수 로직
+                    window.open(decodedText, '_blank');
+                    closeScanner();
+                }
+            }
+        ).catch(err => alert("카메라 권한을 허용해주세요."));
+    }
 
-    // [핵심] 인쇄물 HTML 생성 함수 - 데이터가 비어있지 않도록 보장
+    async function matchBMWQR(targetId, bmwQrData) {
+        if(!confirm("이 출고서 데이터를 현재 부품과 매칭하시겠습니까?")) return;
+        
+        // Supabase에 bmw_qr_code 필드가 있어야 합니다 (없으면 자동 생성은 안되니 DB에서 추가 필요)
+        const { error } = await sb.from('qr_returns').update({ bmw_qr_code: bmwQrData }).eq('id', targetId);
+        
+        if(error) {
+            alert("매칭 실패: DB에 'bmw_qr_code' 컬럼이 있는지 확인해주세요.");
+        } else {
+            alert("✅ 순정 출고서와 매칭되었습니다!");
+            closeScanner();
+            fetchData();
+        }
+    }
+
+    function closeScanner() {
+        if(html5QrCode) {
+            html5QrCode.stop().then(() => { document.getElementById('scanner-modal').style.display = 'none'; });
+        } else {
+            document.getElementById('scanner-modal').style.display = 'none';
+        }
+    }
+
+    // 인쇄물 생성 함수 (8구 양식 유지)
     function makeLabelHtml(item) {
-        const vin = item.차대번호 || item.vin || '정보없음';
-        const partNo = item.품번 || item.part_no || '정보없음';
-        const partName = item.품명 || item.part_name || '정보없음';
-        const worker = item.작업자 || item.worker || '미지정';
-        const date = item.교환일 || item.change_date || '-';
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
-
         return `
             <div class="label-card">
-                <div class="qr-side"><img src="${qrUrl}" alt="QR"></div>
+                <div class="qr-side"><img src="${qrUrl}"></div>
                 <div class="info-side">
-                    <div class="line">교환일: ${date}</div>
-                    <div class="line">작업자: ${worker}</div>
-                    <div class="line" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">품명: ${partName}</div>
+                    <div style="font-size:12px; font-weight:700;">날짜: ${item.교환일} / 작업자: ${item.작업자}</div>
+                    <div style="font-size:12px; font-weight:700; margin: 3px 0;">품명: ${item.품명}</div>
                     <div class="data-box">
-                        <div class="val-group">
-                            <span class="val-label">PART NUMBER</span>
-                            <span class="val-text">${partNo}</span>
-                        </div>
-                        <div class="val-group">
-                            <span class="val-label">VIN (LAST 7)</span>
-                            <span class="val-text">${vin.slice(-7)}</span>
-                        </div>
+                        <div style="font-size:9px; font-weight:bold;">PART NUMBER</div>
+                        <div class="val-text">${item.품번}</div>
+                        <div style="font-size:9px; font-weight:bold; margin-top:5px;">VIN (LAST 7)</div>
+                        <div class="val-text">${item.차대번호.slice(-7)}</div>
                     </div>
                 </div>
             </div>`;
     }
 
-    function printOne(id) {
-        const item = masterData.find(i => String(i.id) === String(id));
-        if(!item) return;
-        document.getElementById('print-area').innerHTML = makeLabelHtml(item);
-        setTimeout(() => { window.print(); }, 400);
-    }
-
     function printSelected() {
-        const checkedBoxes = document.querySelectorAll('.row-check:checked');
-        const ids = Array.from(checkedBoxes).map(c => c.value);
-        if(ids.length === 0) return alert("항목을 선택해주세요.");
-        
+        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
+        if(!ids.length) return alert("항목을 선택하세요.");
         const targets = masterData.filter(i => ids.includes(String(i.id)));
         document.getElementById('print-area').innerHTML = targets.map(t => makeLabelHtml(t)).join('');
-        
-        // 데이터가 DOM에 그려진 후 인쇄 실행
-        setTimeout(() => { window.print(); }, 600);
+        setTimeout(() => { window.print(); }, 500);
     }
 
     async function deleteItem(id) {
-        if(!confirm("정말 삭제하시겠습니까?")) return;
-        await sb.from('qr_returns').delete().eq('id', id);
-        fetchData();
+        if(confirm("삭제하시겠습니까?")) { await sb.from('qr_returns').delete().eq('id', id); fetchData(); }
     }
 
-    async function deleteSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
-        if(!ids.length || !confirm(`${ids.length}건을 삭제하시겠습니까?`)) return;
-        await sb.from('qr_returns').delete().in('id', ids);
-        fetchData();
-    }
+    function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
 
     function exportExcel() {
         const ws = XLSX.utils.json_to_sheet(masterData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Returns");
-        XLSX.utils.writeFile(wb, `BMW_Returns_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.writeFile(wb, `BMW_Warranty_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 </script>
 </body>
