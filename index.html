@@ -13,21 +13,38 @@
         h1 { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #1a1a1a; text-align: center; }
         label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; margin-top: 14px; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; }
-        button { width: 100%; margin-top: 20px; padding: 14px; background: #3ecf8e; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+        input:focus { border-color: #3ecf8e; box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.1); }
+        button { width: 100%; margin-top: 24px; padding: 14px; background: #3ecf8e; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+        button:active { background: #34b37b; }
         #qr-result { margin-top: 24px; text-align: center; display: none; border-top: 1px dashed #eee; padding-top: 20px; }
-        canvas { max-width: 100%; height: auto !important; margin: 0 auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        canvas { max-width: 100%; height: auto !important; margin: 0 auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; background: white; }
         .success-msg { background: #e6f9f0; color: #0a7a4a; padding: 12px; border-radius: 8px; margin-top: 16px; font-size: 14px; display: none; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>고품 QR 생성</h1>
-    <label>품번</label><input type="text" id="품번" placeholder="12418571349">
-    <label>품명</label><input type="text" id="품명" placeholder="스타터 모터">
-    <label>교환일</label><input type="date" id="교환일">
-    <label>수량</label><input type="number" id="수량" value="1">
-    <label>작업자</label><input type="text" id="작업자" placeholder="홍길동">
-    <label>수리항목</label><input type="text" id="수리항목" placeholder="리콜 수리">
+    
+    <label>차대번호</label>
+    <input type="text" id="차대번호" placeholder="차대번호 마지막 7자리 또는 전체" oninput="this.value = this.value.toUpperCase()">
+    
+    <label>품번</label>
+    <input type="text" id="품번" placeholder="12418571349">
+    
+    <label>품명</label>
+    <input type="text" id="품명" placeholder="스타터 모터">
+    
+    <label>교환일</label>
+    <input type="date" id="교환일">
+    
+    <label>수량</label>
+    <input type="number" id="수량" value="1">
+    
+    <label>작업자</label>
+    <input type="text" id="작업자" placeholder="김주임">
+    
+    <label>수리항목</label>
+    <input type="text" id="수리항목" placeholder="리콜 수리">
     
     <button onclick="generateQR()">QR 생성 및 저장</button>
     
@@ -47,28 +64,25 @@
         if (typeof QRCode === 'undefined') { alert('라이브러리 로딩 중입니다.'); return; }
 
         const rowData = {
+            차대번호: document.getElementById('차대번호').value.trim(),
             품번: document.getElementById('품번').value.trim(),
             품명: document.getElementById('품명').value.trim(),
             교환일: document.getElementById('교환일').value,
-            수량: parseInt(document.getElementById('수량').value),
+            수량: parseInt(document.getElementById('수량').value) || 1,
             작업자: document.getElementById('작업자').value.trim(),
             수리항목: document.getElementById('수리항목').value.trim()
         };
 
-        if (!rowData.품번 || !rowData.품명 || !rowData.교환일 || !rowData.작업자) {
-            alert('모든 필수 항목을 입력해주세요.'); return;
+        if (!rowData.차대번호 || !rowData.품번 || !rowData.품명 || !rowData.교환일 || !rowData.작업자) {
+            alert('필수 항목(차대번호, 품번, 품명, 교환일, 작업자)을 입력해주세요.'); return;
         }
 
         try {
-            // 1. Supabase 저장
             const { data, error } = await sb.from('qr_returns').insert([rowData]).select();
             if (error) throw error;
 
-            // 2. 중요: HTTPS를 포함한 전체 주소 생성
-            // 깃허브 아이디와 레포지토리 이름이 정확한지 확인하세요.
             const resultPageUrl = `https://junhyeokki.github.io/qr-return-app/result.html?id=${data[0].id}`;
 
-            // 3. QR 생성 (URL 주소를 담음)
             await QRCode.toCanvas(document.getElementById('qr-canvas'), resultPageUrl, { 
                 width: 240,
                 margin: 2
@@ -76,7 +90,7 @@
             
             document.getElementById('qr-result').style.display = 'block';
             document.getElementById('success-msg').style.display = 'block';
-            window.scrollTo(0, document.body.scrollHeight);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         } catch (e) {
             alert('저장 실패: ' + e.message);
         }
