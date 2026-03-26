@@ -1,214 +1,80 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMW Warranty Admin - Final Print Fix</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=JetBrains+Mono:wght@800&display=swap" rel="stylesheet">
-    <style>
-        /* [1. 관리 화면 스타일] 기존 유지 */
-        :root { --primary: #1c69d4; --bg: #f4f7f9; --accent-red: #e74c3c; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
-        .top-btns { display: flex; gap: 8px; }
-        .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .filter-bar input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 2px solid #eee; font-size: 13px; }
-        td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
-        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
-        .btn-excel { background: #157347; color: white; }
-        .btn-sel-print { background: var(--primary); color: white; }
-        .btn-delete-all { background: #fee; color: var(--accent-red); border: 1px solid #fcc; }
-        .row-btn-group { display: flex; gap: 5px; }
-        .btn-mini { padding: 5px 10px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-mini-print { background: #333; color: white; }
-        .btn-mini-del { background: var(--accent-red); color: white; }
-        .qr-thumb { width: 45px; height: 45px; border: 1px solid #eee; }
-
-        /* [2. 인쇄 스타일] A4 한 장에 8장 (2열 4행) 배치 - image_dfc366 기준 */
-        @media print {
-            @page { size: A4; margin: 10mm; } /* 여백 최소화 */
-            body * { display: none !important; }
-            #print-area { 
-                display: grid !important; 
-                grid-template-columns: 1fr 1fr; /* 2열 */
-                gap: 5mm; 
-                width: 100%;
-            }
-            .label-card {
-                display: flex !important;
-                flex-direction: row !important;
-                border: 1.5px solid #000;
-                height: 65mm !important; /* A4 4행을 위한 높이 조절 */
-                padding: 3mm !important;
-                box-sizing: border-box;
-                align-items: center;
-                background: white;
-            }
-            .qr-side { width: 35% !important; flex-shrink: 0; padding-right: 3mm; border-right: 1px solid #eee; }
-            .qr-side img { width: 100%; height: auto; }
-            
-            .info-side { flex-grow: 1; padding-left: 3mm; display: flex !important; flex-direction: column !important; overflow: hidden; }
-            .line { font-size: 11px; font-weight: 700; line-height: 1.4; margin-bottom: 2px; }
-            
-            .data-box { 
-                margin-top: 5px; padding-top: 5px; border-top: 1.5px solid #000; 
-                display: flex !important; flex-direction: column !important; gap: 5px; 
-            }
-            .val-group { display: flex; flex-direction: column; }
-            .val-label { font-size: 9px; color: #444; font-weight: bold; margin-bottom: -2px; }
-            .val-text { font-family: 'JetBrains Mono'; font-size: 16px; font-weight: 800; color: #000; }
+<style>
+    @media print {
+        @page { size: A4; margin: 10mm; }
+        body * { display: none !important; }
+        #print-area { 
+            display: grid !important; 
+            grid-template-columns: 1fr 1fr; /* 2열 배치 */
+            gap: 4mm; 
+            width: 100%;
         }
-        #print-area { display: none; }
-    </style>
-</head>
-<body>
-
-<div class="admin-container">
-    <div class="header">
-        <h2 style="margin:0;">📦 고품 반납 관리 리스트</h2>
-        <div class="top-btns">
-            <button class="btn btn-excel" onclick="exportExcel()">📊 엑셀 내보내기</button>
-            <button class="btn btn-sel-print" onclick="printSelected()">📄 병합 인쇄</button>
-            <button class="btn btn-delete-all" onclick="deleteSelected()">🗑️ 선택 삭제</button>
-        </div>
-    </div>
-
-    <div class="filter-bar">
-        <span>조회 기간:</span>
-        <input type="date" id="startDate">
-        <span>~</span>
-        <input type="date" id="endDate">
-        <button class="btn btn-sel-print" style="background:#333;" onclick="fetchData()">조회하기</button>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
-                <th>QR</th>
-                <th>차대번호 (VIN)</th>
-                <th>부품 정보</th>
-                <th>교환일</th>
-                <th>작업자</th>
-                <th style="text-align:center;">기능</th>
-            </tr>
-        </thead>
-        <tbody id="list-body"></tbody>
-    </table>
-</div>
-
-<div id="print-area"></div>
+        /* 개별 라벨 카드 */
+        .label-card {
+            display: flex !important;
+            border: 1.5px solid #000;
+            height: 65mm;
+            padding: 5mm;
+            box-sizing: border-box;
+            background: white;
+            align-items: center;
+        }
+        .qr-side { width: 35%; padding-right: 4mm; border-right: 1px solid #ddd; }
+        .qr-side img { width: 100%; height: auto; display: block; }
+        
+        .info-side { 
+            width: 65%; 
+            padding-left: 4mm; 
+            display: flex !important; 
+            flex-direction: column !important; 
+            justify-content: center;
+        }
+        .line { font-size: 12px; font-weight: 700; margin-bottom: 3px; color: #000; }
+        .data-box { 
+            margin-top: 8px; 
+            padding-top: 8px; 
+            border-top: 2px solid #000; 
+            display: flex !important; 
+            flex-direction: column !important; 
+        }
+        .val-group { margin-bottom: 5px; }
+        .val-label { font-size: 10px; color: #555; display: block; font-weight: bold; }
+        .val-text { font-family: 'JetBrains Mono'; font-size: 17px; font-weight: 800; color: #000; }
+    }
+</style>
 
 <script>
-    const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    let masterData = [];
-
-    window.onload = () => {
-        const now = new Date();
-        const before = new Date();
-        before.setDate(now.getDate() - 14);
-        document.getElementById('endDate').value = now.toISOString().split('T')[0];
-        document.getElementById('startDate').value = before.toISOString().split('T')[0];
-        fetchData();
-    };
-
-    async function fetchData() {
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-        let query = sb.from('qr_returns').select('*').order('교환일', { ascending: false });
-        if(start) query = query.gte('교환일', start);
-        if(end) query = query.lte('교환일', end);
-        const { data } = await query;
-        masterData = data;
-        render(data);
-    }
-
-    function render(data) {
-        document.getElementById('list-body').innerHTML = data.map(item => `
-            <tr>
-                <td><input type="checkbox" class="row-check" value="${item.id}"></td>
-                <td><img class="qr-thumb" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
-                <td style="font-family:'JetBrains Mono'; font-weight:700; color:#1c69d4;">${item.차대번호}</td>
-                <td><b>${item.품번}</b><br><small style="color:#666;">${item.품명}</small></td>
-                <td>${item.교환일}</td>
-                <td>${item.작업자}</td>
-                <td style="text-align:center;">
-                    <div class="row-btn-group">
-                        <button class="btn-mini btn-mini-print" onclick="printOne('${item.id}')">인쇄</button>
-                        <button class="btn-mini btn-mini-del" onclick="deleteItem('${item.id}')">삭제</button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
-
-    // 병합 인쇄용 라벨 (image_dfc366 양식)
+    // 이 함수가 데이터를 받아 실제 HTML로 변환하는 핵심입니다.
     function makeLabelHtml(item) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+        // 데이터 누락 방지를 위한 검증
+        const vin = item.차대번호 || 'N/A';
+        const partNo = item.품번 || 'N/A';
+        const partName = item.품명 || '정보 없음';
+        const worker = item.작업자 || '미지정';
+        const date = item.교환일 || '-';
+        
+        // QR 생성 (데이터 유무 확인)
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+
         return `
             <div class="label-card">
-                <div class="qr-side"><img src="${qrUrl}"></div>
+                <div class="qr-side">
+                    <img src="${qrUrl}" alt="QR">
+                </div>
                 <div class="info-side">
-                    <div class="line">교환일: ${item.교환일}</div>
-                    <div class="line">작업자: ${item.작업자}</div>
-                    <div class="line">품명: ${item.품명}</div>
+                    <div class="line">교환일: ${date}</div>
+                    <div class="line">작업자: ${worker}</div>
+                    <div class="line">품명: ${partName}</div>
                     <div class="data-box">
                         <div class="val-group">
                             <span class="val-label">PART NUMBER</span>
-                            <span class="val-text">${item.품번}</span>
+                            <span class="val-text">${partNo}</span>
                         </div>
                         <div class="val-group">
                             <span class="val-label">VIN (LAST 7)</span>
-                            <span class="val-text">${item.차대번호.slice(-7)}</span>
+                            <span class="val-text">${vin.slice(-7)}</span>
                         </div>
                     </div>
                 </div>
             </div>`;
     }
-
-    function printOne(id) {
-        const item = masterData.find(i => String(i.id) === String(id));
-        document.getElementById('print-area').innerHTML = makeLabelHtml(item);
-        setTimeout(() => { window.print(); }, 300);
-    }
-
-    function printSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
-        if(ids.length === 0) return alert("선택된 항목이 없습니다.");
-        const targets = masterData.filter(i => ids.includes(String(i.id)));
-        // 병합 인쇄 영역에 8개씩 들어갈 수 있도록 HTML 생성
-        document.getElementById('print-area').innerHTML = targets.map(t => makeLabelHtml(t)).join('');
-        setTimeout(() => { window.print(); }, 500);
-    }
-
-    async function deleteItem(id) {
-        if(!confirm("정말 삭제하시겠습니까?")) return;
-        await sb.from('qr_returns').delete().eq('id', id);
-        fetchData();
-    }
-
-    async function deleteSelected() {
-        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
-        if(!ids.length || !confirm(`선택한 ${ids.length}건을 삭제하시겠습니까?`)) return;
-        await sb.from('qr_returns').delete().in('id', ids);
-        fetchData();
-    }
-
-    function exportExcel() {
-        const ws = XLSX.utils.json_to_sheet(masterData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Returns");
-        XLSX.utils.writeFile(wb, `BMW_Returns_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
 </script>
-</body>
-</html>
