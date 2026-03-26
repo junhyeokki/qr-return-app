@@ -8,11 +8,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        /* [1. 관리 페이지 UI - 기존 유지] */
+        /* [1. 관리 페이지 기본 UI] */
         :root { --primary-color: #1c69d4; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-main: #262626; --text-sub: #666666; --accent-red: #d12a2a; }
         body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 40px 20px; margin: 0; }
         .admin-container { max-width: 1300px; margin: 0 auto; }
-        .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 10px; }
+        .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         h1 { font-size: 26px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 12px; }
         h1::before { content: ''; width: 4px; height: 26px; background: var(--primary-color); border-radius: 2px; }
         
@@ -20,12 +20,15 @@
         .filter-group { display: flex; align-items: center; gap: 10px; }
         .filter-group input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
         
-        .btn { padding: 10px 18px; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
-        .btn-search { background: #333; color: white; }
+        /* 🔥 [UI 수정] 버튼창 우측 정렬 및 사이즈 통일 */
+        .btn-group { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; width: 220px; } /* 너비 고정 및 우정렬 */
+        .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
+        
+        .btn-search { background: #333; color: white; width: auto !important; }
         .btn-excel { background: #1d6f42; color: white; }
-        .btn-multi-print { background: var(--primary-color); color: white; }
-        .btn-merge-print { background: #2ecc71; color: white; } /* 병합 인쇄 버튼 (초록색) */
-        .btn-multi-delete { background: #fcebea; color: var(--accent-red); }
+        .btn-merge-print { background: #2ecc71; color: white; } /* 모아찍기 (초록) */
+        .btn-multi-print { background: var(--primary-color); color: white; } /* 라벨형 (파랑) */
+        .btn-multi-delete { background: #fcebea; color: var(--accent-red); font-weight: 700; }
 
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn:active { transform: translateY(0); }
@@ -45,9 +48,14 @@
         .qr-thumb:hover { transform: scale(1.5); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
 
-        /* 🔥 [핵심 수정] 병합 인쇄전용 CSS 설정 */
+        /* 🔥 [핵심 복구] 인쇄 여백 제로 및 콤팩트 사이즈 설정 (image_ddf1ea.png 버전) */
         #print-section { display: none; }
         @media print {
+            @page {
+                margin: 0; /* 브라우저 강제 여백 제거 */
+                size: auto;
+            }
+            body { margin: 0; padding: 0; background: #fff; }
             body * { display: none !important; }
             #print-section, #print-section * { display: block !important; }
             
@@ -60,32 +68,37 @@
                 left: 0;
             }
 
-            /* [2xN 그리드 배열] 정보가 옆으로 나오게 설정 */
+            /* [모아찍기 그리드] */
             .merged-print-container {
                 display: grid !important;
-                grid-template-columns: repeat(2, 1fr) !important; /* 가로 2개 */
-                gap: 5mm !important; /* 라벨 간격 */
-                padding: 5mm !important; /* 종이 여백 */
-                page-break-after: always; /* 한 장 채우면 다음 장으로 */
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 5mm !important;
+                padding: 5mm !important;
+                page-break-after: always;
             }
 
+            /* 콤팩트 라벨 디자인 복구 */
             .label-card { 
+                width: 100%;
+                margin: 0; 
+                padding: 8px; /* 여백 축소 */
                 border: 2px solid #000;
-                padding: 10px;
                 text-align: left;
                 background: white;
                 box-sizing: border-box;
+                font-family: 'Noto Sans KR', sans-serif;
             }
             
-            .label-header { font-size: 11px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 5px; color: #555; }
-            .label-body { display: flex; align-items: start; gap: 8px; border-bottom: 1.5px solid #000; padding-bottom: 5px; margin-bottom: 5px; }
-            .label-qr img { width: 80px; height: 80px; }
-            .label-info { font-size: 13px; line-height: 1.4; }
-            .label-info div { display: flex; gap: 5px; }
-            .label-label { font-weight: bold; width: 50px; display: inline-block; color: #666; }
+            .label-header { font-size: 10px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 2px; margin-bottom: 4px; color: #777; }
+            .label-body { display: flex; align-items: start; gap: 6px; border-bottom: 1.5px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
+            .label-qr img { width: 70px; height: 70px; } /* QR 사이즈 축소 */
+            .label-info { font-size: 12px; line-height: 1.3; flex: 1; }
+            .label-info div { display: flex; gap: 4px; margin-bottom: 1px; }
+            .label-label { font-weight: bold; width: 45px; display: inline-block; color: #555; }
+            .label-vin { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #1c69d4; font-size: 12px; }
 
-            .label-footer { font-size: 14px; font-weight: bold; }
-            .big-text { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 900; }
+            .label-footer { font-size: 13px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+            .big-text { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 900; }
         }
     </style>
 </head>
@@ -94,7 +107,7 @@
 <div class="admin-container">
     <div class="header-section">
         <h1>고품 반납 관리 시스템</h1>
-        <button class="btn btn-excel" onclick="downloadExcel()">📊 엑셀 내보내기</button>
+        <button class="btn btn-excel" style="width:auto;" onclick="downloadExcel()">📊 엑셀 내보내기</button>
     </div>
 
     <div class="control-bar">
@@ -189,7 +202,7 @@
         return fetchedData.filter(item => selectedIds.includes(item.id));
     }
 
-    // 🔥 [핵심] 병합 인쇄 (모아찍기) 함수
+    // 🔥 [복구 및 수정] 병합 인쇄 (모아찍기) - 콤팩트 레이아웃 적용
     function printMerged() {
         const selected = getSelectedItems();
         if (selected.length === 0) return alert("병합 인쇄할 항목을 선택해 주세요.");
@@ -204,10 +217,10 @@
                         <div class="label-body">
                             <div class="label-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></div>
                             <div class="label-info">
-                                <div><span class="label-label">VIN:</span> <span class="vin-text">${item.차대번호}</span></div>
+                                <div><span class="label-label">VIN:</span> <span class="label-vin">${item.차대번호}</span></div>
                                 <div><span class="label-label">작업자:</span> ${item.작업자}</div>
                                 <div><span class="label-label">교환일:</span> ${item.교환일}</div>
-                                <div style="font-size:11px; margin-top:3px; border-top:1px dashed #ddd; padding-top:2px;">${item.품명}</div>
+                                <div style="font-size:11px; margin-top:2px; border-top:1px dashed #eee; padding-top:2px; color:#666;">${item.품명}</div>
                             </div>
                         </div>
                         <div class="label-footer">PART: <span class="big-text">${item.품번}</span></div>
@@ -219,17 +232,17 @@
         setTimeout(() => { window.print(); }, 500);
     }
 
-    // 기존 개별 인쇄 함수 (독립 라벨형)
+    // 기존 개별 인쇄 함수 (독립 라벨형) - 여백 제거 적용
     function printSelected() {
         const selected = getSelectedItems();
         if (selected.length === 0) return alert("인쇄할 항목을 선택해 주세요.");
         const area = document.getElementById('print-section');
         area.innerHTML = selected.map(item => `
-            <div class="label-card" style="border:2px solid #000; width:320px; margin:20px auto; padding:25px; text-align:center; page-break-after:always; background:white;">
-                <h2 style="font-family:sans-serif; margin:0 0 10px 0;">고품 반납표</h2>
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}" style="width:220px; height:220px; margin-bottom:15px;">
-                <div style="text-align:left; font-size:14px; border-top:1.5px solid #000; padding-top:10px; line-height:1.6;">
-                    <div><b>차대번호:</b> ${item.차대번호}</div>
+            <div class="label-card" style="border:2px solid #000; width:320px; margin:0 auto; padding:15px; text-align:center; page-break-after:always; background:white; box-sizing:border-box;">
+                <h2 style="font-family:sans-serif; margin:0 0 10px 0; font-size:20px;">고품 반납표</h2>
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}" style="width:200px; height:200px; margin-bottom:12px;">
+                <div style="text-align:left; font-size:14px; border-top:1.5px solid #000; padding-top:8px; line-height:1.5;">
+                    <div><b>차대번호:</b> <span class="vin-text">${item.차대번호}</span></div>
                     <div><b>품번:</b> ${item.품번}</div>
                     <div style="font-size:12px; color:#555;">${item.품명}</div>
                     <div><b>교환일:</b> ${item.교환일}</div>
