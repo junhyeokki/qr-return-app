@@ -25,9 +25,9 @@
         table { width: 100%; border-collapse: collapse; }
         th { padding: 15px; text-align: left; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; text-transform: uppercase; }
         td { padding: 18px 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-        
-        /* 수거 완료 텍스트 스타일 */
-        .status-tag { font-weight: 800; color: var(--success); background: #f0fdf4; padding: 4px 10px; border-radius: 15px; font-size: 12px; display: inline-block; margin-left: 8px; }
+
+        /* 상태 표시 태그 */
+        .status-tag { font-weight: 800; color: var(--success); background: #f0fdf4; padding: 4px 10px; border-radius: 15px; font-size: 12px; margin-left: 8px; white-space: nowrap; }
 
         @media print {
             @page { size: A4; margin: 0; }
@@ -139,7 +139,7 @@
             const isPartMatch = originPart.replace(/[^a-zA-Z0-9]/g, '') === scPart.replace(/[^a-zA-Z0-9]/g, '');
 
             if (isVinMatch && isPartMatch) {
-                if(confirm(`[판독 결과: 일치]\n수거 완료 처리하시겠습니까?`)) {
+                if(confirm(`[판독 결과: 일치]\n차대: ${scVin}\n품번: ${scPart}\n수거 완료 처리하시겠습니까?`)) {
                     await sb.from('qr_returns').update({ 
                         bmw_qr_code: decodedText,
                         차대번호: scVin,
