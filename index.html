@@ -153,6 +153,11 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
 .elapsed-warn   { background:rgba(245,166,35,0.12);  color:var(--p);    border:1px solid rgba(245,166,35,0.2); }
 .elapsed-danger { background:rgba(240,96,96,0.12);   color:var(--fail); border:1px solid rgba(240,96,96,0.2); }
 .mbtn.cancel:hover { color:var(--p); border-color:rgba(245,166,35,0.3); background:var(--p-dim); }
+/* 미수거 경과일 행 강조 */
+.row-danger { background: rgba(240,96,96,0.05) !important; }
+.row-danger:hover { background: rgba(240,96,96,0.08) !important; }
+.row-warn   { background: rgba(245,166,35,0.05) !important; }
+.row-warn:hover   { background: rgba(245,166,35,0.08) !important; }
 
 .tag { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
 .tok   { background:var(--ok-dim);   color:var(--ok);   border:1px solid rgba(52,196,138,0.2); }
@@ -677,8 +682,38 @@ async function generateQR(){
 }
 
 /* ── 텔레그램 알림 ── */
+async function sendTelegramCollected(item, scan){
+  const BOT_TOKEN = document.querySelector('script[data-bot]')?.dataset.bot || '';
+  // BOT_TOKEN을 sendTelegramAlert와 동일하게 가져오기 위해 공통 함수 사용
+  const CHAT_ID = '8761728345';
+  const msg = [
+    '✅ *수거 완료 알림*',
+    '',
+    `🔲 *RO번호:* ${item.ro번호||scan.ro||'—'}`,
+    `📋 *클레임번호:* ${scan.claim||item.클레임번호||'—'}`,
+    `🚗 *차대번호:* ${scan.vin||item.차대번호}`,
+    `🔧 *품번:* ${scan.part||item.품번}`,
+    `📝 *품명:* ${item.품명}`,
+    `👤 *작업자:* ${item.작업자}`,
+  ].join('\n');
+  try {
+    const BOT = getTelegramToken();
+    if(!BOT) return;
+    await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode:'Markdown' })
+    });
+  } catch(e){ console.warn('텔레그램 수거완료 알림 실패:', e); }
+}
+
+/* ── 텔레그램 알림 ── */
+function getTelegramToken(){
+  // 봇 토큰을 여기에 입력하세요
+  return '여기에봇토큰입력';
+}
+
 async function sendTelegramAlert(item, id){
-  const BOT_TOKEN = '여기에봇토큰입력';  // ← 새로 발급받은 토큰 입력
+  const BOT_TOKEN = getTelegramToken();
   const CHAT_ID   = '8761728345';
   const msg = [
     '📦 *고품 QR 생성 알림*',
@@ -777,7 +812,9 @@ function renderDashRows(rows){
     const ok=!!r.bmw_qr_code; let cd='';
     if(ok){ const f=r.bmw_qr_code.split(','); if(f[7]?.length===6) cd=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`; if(!cd&&r.created_at) cd=r.created_at.slice(0,10); }
     const elapsedHtml = !ok ? elapsedTag(r.created_at) : '';
-    return `<tr>
+    const days = !ok ? Math.floor((Date.now()-new Date(r.created_at))/86400000) : 0;
+    const rowCls = !ok && days>=7 ? 'row-danger' : !ok && days>=3 ? 'row-warn' : '';
+    return `<tr class="${rowCls}">
       <td>
         <div class="claim-val">${r.클레임번호||'—'}</div>
         <div class="ro-val">RO: ${r.ro번호||'—'}</div>
@@ -811,7 +848,7 @@ function renderAdmin(data){
   if(!data.length){ document.getElementById('ae2').style.display='block'; return; }
   document.getElementById('at').style.display='table';
   document.getElementById('ab').innerHTML=data.map(r=>`
-    <tr id="row-${r.id}">
+    ${(()=>{ const d=!r.bmw_qr_code?Math.floor((Date.now()-new Date(r.created_at))/86400000):0; const rc=!r.bmw_qr_code&&d>=7?'row-danger':!r.bmw_qr_code&&d>=3?'row-warn':''; return `<tr id="row-${r.id}" class="${rc}">`; })()}
       <td><input type="checkbox" class="row-check" value="${r.id}" style="accent-color:var(--p);"></td>
       <td><img style="width:42px;border-radius:6px;border:1px solid var(--border);" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${r.id}"></td>
       <td>
@@ -940,6 +977,10 @@ async function confirmMatch(){
 
   closeMatchModal();
 
+  // 텔레그램 수거완료 알림
+  const matchedItem = AD.find(i=>String(i.id)===String(id));
+  if(matchedItem) await sendTelegramCollected(matchedItem, scan);
+
   // 애니메이션 뱃지
   const mc=document.getElementById(`mc-${id}`);
   if(mc){
@@ -1040,7 +1081,7 @@ function printSelected(){
 }
 function lbl(r){
   const q=`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${r.id}`;
-  return `<div class="label-card"><div class="qr-side"><img src="${q}"></div><div class="info-side"><div style="font-size:12px;font-weight:700;">날짜: ${r.교환일} / 작업자: ${r.작업자}</div><div style="font-size:12px;font-weight:700;margin-top:2px;">품명: ${r.품명}</div><div class="data-box"><div style="font-size:9px;font-weight:bold;">PART NUMBER</div><div class="val-text">${r.품번}</div><div style="font-size:9px;font-weight:bold;margin-top:5px;">VIN (LAST 7)</div><div class="val-text">${r.차대번호.slice(-7)}</div></div></div></div>`;
+  return `<div class="label-card"><div class="qr-side"><img src="${q}"></div><div class="info-side"><div style="font-size:12px;font-weight:700;">날짜: ${r.교환일} / 작업자: ${r.작업자}</div><div style="font-size:12px;font-weight:700;margin-top:2px;">품명: ${r.품명}</div>${r.클레임번호?`<div style="font-size:11px;font-weight:700;margin-top:2px;">클레임: ${r.클레임번호} / RO: ${r.ro번호||'—'}</div>`:''}<div class="data-box"><div style="font-size:9px;font-weight:bold;">PART NUMBER</div><div class="val-text">${r.품번}</div><div style="font-size:9px;font-weight:bold;margin-top:5px;">VIN (LAST 7)</div><div class="val-text">${r.차대번호.slice(-7)}</div></div></div></div>`;
 }
 async function cancelMatch(id){
   if(!confirm("수거 완료를 취소하시겠습니까?\n매칭 정보가 초기화됩니다.")) return;
