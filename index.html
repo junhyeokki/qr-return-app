@@ -545,9 +545,12 @@ function goPage(n){
       <button class="btn btn-excel" onclick="exportExcel()">📊 <span>엑셀</span></button>
       <button class="btn btn-p" onclick="printSelected()">🖨 <span>병합인쇄</span></button>`;
     if(!AD.length) fetchAdmin();
+  } else if(n==='dash'){
+    document.getElementById('tb-r').innerHTML=`
+      <button class="btn btn-excel" onclick="exportDashExcel()">📊 <span>엑셀 저장</span></button>`;
+    if(!DD.length) loadDash();
   } else {
     document.getElementById('tb-r').innerHTML='';
-    if(n==='dash'&&!DD.length) loadDash();
   }
   closeSidebar();
 }
@@ -576,7 +579,40 @@ async function generateQR(){
     document.getElementById('q-result').style.display='block';
     document.getElementById('q-success').style.display='block';
     AD=[];DD=[];
+    // 텔레그램 알림 전송
+    await sendTelegramAlert(rowData, data[0].id);
   } catch(e){ alert('저장 실패: '+e.message); }
+}
+
+/* ── 텔레그램 알림 ── */
+async function sendTelegramAlert(item, id){
+  const BOT_TOKEN = '8661698521:AAGZc8cL5liR9ww32sbO8syMA-rw5dKfGys';  // ← 새로 발급받은 토큰 입력
+  const CHAT_ID   = '145111690';
+  const msg = [
+    '📦 *고품 QR 생성 알림*',
+    '',
+    `🔲 *RO번호:* ${item.ro번호||'—'}`,
+    `🚗 *차대번호:* ${item.차대번호}`,
+    `🔧 *품번:* ${item.품번}`,
+    `📝 *품명:* ${item.품명}`,
+    `📅 *교환일:* ${item.교환일}`,
+    `👤 *작업자:* ${item.작업자}`,
+    `🛠 *수리항목:* ${item.수리항목||'—'}`,
+    '',
+    `🔗 [상세보기](https://junhyeokki.github.io/qr-return-app/result.html?id=${id})`
+  ].join('\n');
+
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: msg,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch(e){ console.warn('텔레그램 알림 실패:', e); }
 }
 
 /* ── 경과일 계산 ── */
@@ -812,6 +848,45 @@ function closeScanner(){
 }
 
 /* ── 엑셀/인쇄 ── */
+function exportDashExcel(){
+  if(!DD.length){ alert('조회된 데이터가 없습니다.'); return; }
+  // 현황 데이터를 보기 좋게 가공
+  const rows = DD.map(r => {
+    const ok = !!r.bmw_qr_code;
+    let collectDate = '';
+    if(ok && r.bmw_qr_code){
+      const f = r.bmw_qr_code.split(',');
+      if(f[7]?.length===6) collectDate = `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`;
+      if(!collectDate && r.created_at) collectDate = r.created_at.slice(0,10);
+    }
+    const days = Math.floor((Date.now() - new Date(r.created_at)) / 86400000);
+    return {
+      '클레임번호':  r.클레임번호 || '',
+      'RO번호':      r.ro번호 || '',
+      '차대번호':    r.차대번호,
+      '품번':        r.품번,
+      '품명':        r.품명,
+      '작업자':      r.작업자,
+      '수리항목':    r.수리항목 || '',
+      '교환일':      r.교환일 || '',
+      '수거상태':    ok ? '수거 완료' : '미수거',
+      '수거일자':    collectDate,
+      '미수거경과일': !ok ? `${days}일` : '',
+      '등록일시':    r.created_at ? r.created_at.slice(0,16).replace('T',' ') : '',
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // 컬럼 너비 설정
+  ws['!cols'] = [
+    {wch:12},{wch:10},{wch:20},{wch:16},{wch:14},{wch:8},
+    {wch:20},{wch:10},{wch:10},{wch:10},{wch:12},{wch:16}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '반납현황');
+  const s = document.getElementById('ds').value;
+  const e = document.getElementById('de').value;
+  XLSX.utils.writeFile(wb, `고품반납현황_${s}_${e}.xlsx`);
+}
 function exportExcel(){
   const ws=XLSX.utils.json_to_sheet(AD),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Returns");
