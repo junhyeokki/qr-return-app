@@ -1,100 +1,706 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>고품 QR 생성 시스템</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.min.js"></script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 480px; margin: 0 auto; background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-        h1 { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #1a1a1a; text-align: center; }
-        label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; margin-top: 14px; }
-        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; }
-        input:focus { border-color: #3ecf8e; box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.1); }
-        button { width: 100%; margin-top: 24px; padding: 14px; background: #3ecf8e; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
-        button:active { background: #34b37b; }
-        #qr-result { margin-top: 24px; text-align: center; display: none; border-top: 1px dashed #eee; padding-top: 20px; }
-        canvas { max-width: 100%; height: auto !important; margin: 0 auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; background: white; }
-        .success-msg { background: #e6f9f0; color: #0a7a4a; padding: 12px; border-radius: 8px; margin-top: 16px; font-size: 14px; display: none; text-align: center; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMW 고품 반납 시스템</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #1c69d4;
+    --primary-light: #e8f0fd;
+    --success: #0d9e5c;
+    --success-light: #e6f7f0;
+    --danger: #e03131;
+    --danger-light: #fff0f0;
+    --bg: #f7f8fc;
+    --white: #ffffff;
+    --text: #1a1d27;
+    --text-sub: #6b7280;
+    --border: #e9ecf0;
+    --sidebar-w: 220px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+
+  /* ══ 사이드바 ══ */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: #12172b;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 200;
+    transition: transform 0.25s ease;
+  }
+  .sidebar-logo {
+    padding: 22px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .sidebar-logo .brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--primary);
+    letter-spacing: 1px;
+  }
+  .sidebar-logo .sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 3px;
+  }
+  .nav-section {
+    padding: 16px 12px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    margin: 2px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.55);
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
+  .nav-item.active { background: var(--primary); color: white; font-weight: 700; }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+  }
+
+  /* ══ 메인 ══ */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .topbar {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    height: 52px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-title { font-size: 15px; font-weight: 700; }
+  .topbar-actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: 0.15s;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: #1558b0; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-excel { background: #157347; color: white; }
+  .btn-ghost { background: var(--bg); color: var(--text-sub); border: 1px solid var(--border); }
+
+  .content { padding: 24px; }
+
+  /* ══ 페이지 전환 ══ */
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ══ 공통 카드 ══ */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ══ 통계 그리드 ══ */
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat-card:nth-child(2) { border-left: 3px solid var(--success); }
+  .stat-card:nth-child(3) { border-left: 3px solid var(--danger); }
+  .stat-card:nth-child(4) { border-left: 3px solid var(--primary); }
+  .stat-label { font-size: 11px; color: var(--text-sub); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 800; }
+  .stat-card:nth-child(2) .stat-value { color: var(--success); }
+  .stat-card:nth-child(3) .stat-value { color: var(--danger); }
+  .stat-card:nth-child(4) .stat-value { color: var(--primary); }
+
+  /* ══ 필터바 ══ */
+  .filter-bar {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+  }
+  .filter-bar label { font-size: 12px; color: var(--text-sub); font-weight: 600; }
+  .filter-bar input[type="date"], .filter-bar select {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text);
+    outline: none;
+    background: var(--bg);
+  }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: var(--primary); }
+
+  /* ══ 탭 ══ */
+  .tab-bar { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-sub);
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .tab-btn.t-active { background: var(--primary); border-color: var(--primary); color: white; }
+  .tab-btn.t-ok { background: var(--success); border-color: var(--success); color: white; }
+  .tab-btn.t-fail { background: var(--danger); border-color: var(--danger); color: white; }
+
+  /* ══ 테이블 ══ */
+  .table-wrap { background: var(--white); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 2px solid var(--border); background: #fafbfc; }
+  th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  td { padding: 13px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #f9fafc; }
+  .claim-no { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; color: var(--primary); }
+  .part-code { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; }
+  .vin { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: var(--primary); }
+
+  /* ══ 뱃지 ══ */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .badge-ok { background: var(--success-light); color: var(--success); border: 1px solid #b6ead3; }
+  .badge-fail { background: var(--danger-light); color: var(--danger); border: 1px solid #ffc9c9; }
+
+  /* ══ 매칭 셀 ══ */
+  .match-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn-match { background: var(--success); color: white; padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: 20px; border: none; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; }
+  .badge-success-anim {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 800;
+    color: #fff; background: linear-gradient(135deg, #0d9e5c, #2ecc71);
+    box-shadow: 0 0 0 0 rgba(13,158,92,0.5);
+    opacity: 0; transform: scale(0.6) translateX(-6px);
+    animation: badgeIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards, pulse 1.2s ease-out 0.4s 2;
+  }
+  .badge-success-anim .ck { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; background:rgba(255,255,255,0.3); border-radius:50%; font-size:10px; animation: checkPop 0.3s cubic-bezier(0.34,1.56,0.64,1) 0.35s both; }
+  @keyframes badgeIn { 0%{opacity:0;transform:scale(0.6) translateX(-6px)} 100%{opacity:1;transform:scale(1) translateX(0)} }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(13,158,92,0.5)} 70%{box-shadow:0 0 0 8px rgba(13,158,92,0)} 100%{box-shadow:0 0 0 0 rgba(13,158,92,0)} }
+  @keyframes checkPop { 0%{transform:scale(0)} 100%{transform:scale(1)} }
+  .row-matched { animation: rowFlash 0.6s ease forwards; }
+  @keyframes rowFlash { 0%{background:rgba(13,158,92,0.12)} 100%{background:transparent} }
+
+  /* ══ 기타 ══ */
+  .date-ok { color: var(--primary); font-weight: 600; font-size: 13px; }
+  .dash { color: #ccc; }
+  .memo { color: var(--text-sub); font-size: 12px; }
+  .btn-del { background: #fff1f1; color: var(--danger); border: 1px solid #ffebeb; padding: 4px 9px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .btn-print { background: #f8f9fa; color: #334155; border: 1px solid var(--border); padding: 4px 9px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+
+  /* ══ 로딩 ══ */
+  .loading { text-align: center; padding: 50px; color: var(--text-sub); }
+  .spinner { width: 26px; height: 26px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 10px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .empty { text-align:center; padding:50px; color:var(--text-sub); font-size:14px; }
+
+  /* ══ 스캐너 ══ */
+  #scanner-modal { display:none; position:fixed; top:0;left:0;width:100%;height:100%; background:rgba(0,0,0,0.9); z-index:2000; justify-content:center; align-items:center; flex-direction:column; }
+  #reader { width:90%; max-width:450px; background:white; border-radius:12px; overflow:hidden; }
+
+  /* ══ 인쇄 ══ */
+  @media print {
+    .sidebar, .topbar, .filter-bar, .tab-bar, .topbar-actions { display:none !important; }
+    .main { margin-left:0; }
+    @page { size:A4; margin:0; }
+    body * { visibility:hidden; }
+    #print-area, #print-area * { visibility:visible; }
+    #print-area { position:absolute; left:0; top:0; width:210mm; display:grid !important; grid-template-columns:105mm 105mm; grid-auto-rows:74.25mm; }
+    .label-card { width:105mm; height:74.25mm; border:0.1mm solid #000; box-sizing:border-box; display:flex !important; padding:8mm; align-items:center; page-break-inside:avoid; }
+    .qr-side { width:35mm; }
+    .qr-side img { width:32mm !important; height:32mm !important; }
+    .info-side { flex:1; margin-left:6mm; }
+    .data-box { border-top:2px solid #000; margin-top:4mm; padding-top:3mm; }
+    .val-text { font-family:'JetBrains Mono'; font-size:17pt; font-weight:800; }
+  }
+  #print-area { display:none; }
+
+  /* ══ 모바일 ══ */
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .stat-grid { grid-template-columns: repeat(2,1fr); }
+    .hamburger { display:flex !important; }
+    .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:199; }
+    .overlay.show { display:block; }
+  }
+  .hamburger { display:none; background:none; border:none; cursor:pointer; font-size:20px; padding:4px; }
+</style>
 </head>
 <body>
-<div class="container">
-    <h1>고품 QR 생성</h1>
-    
-    <label>차대번호</label>
-    <input type="text" id="차대번호" placeholder="차대번호 마지막 7자리 또는 전체" oninput="this.value = this.value.toUpperCase()">
-    
-    <label>품번</label>
-    <input type="text" id="품번" placeholder="12418571349">
-    
-    <label>품명</label>
-    <input type="text" id="품명" placeholder="스타터 모터">
-    
-    <label>교환일</label>
-    <input type="date" id="교환일">
-    
-    <label>수량</label>
-    <input type="number" id="수량" value="1">
-    
-    <label>작업자</label>
-    <input type="text" id="작업자" placeholder="김주임">
-    
-    <label>수리항목</label>
-    <input type="text" id="수리항목" placeholder="리콜 수리">
-    
-    <button onclick="generateQR()">QR 생성 및 저장</button>
-    
-    <div class="success-msg" id="success-msg">✅ 서버 저장 완료!</div>
-    <div id="qr-result">
-        <canvas id="qr-canvas"></canvas>
-        <p style="margin-top:10px; color:#666; font-size:12px;">스캔 시 상세페이지로 이동합니다.</p>
+
+<!-- 사이드바 -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">BMW PARTS</div>
+    <div class="sub">고품 반납 관리 시스템</div>
+  </div>
+  <div class="nav-section">메뉴</div>
+  <div class="nav-item active" id="nav-dashboard" onclick="goPage('dashboard')">
+    <span class="icon">📊</span> 반납 현황
+  </div>
+  <div class="nav-item" id="nav-admin" onclick="goPage('admin')">
+    <span class="icon">⚙️</span> QR 관리
+  </div>
+  <div class="sidebar-footer">junhyeokki · 전주점</div>
+</div>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- 메인 -->
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="hamburger" id="hamburger" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="topbar-title">📊 반납 현황</span>
     </div>
+    <div class="topbar-actions" id="topbar-actions">
+      <!-- 페이지별로 다른 버튼 -->
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── 현황 페이지 ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="filter-bar">
+        <label>기간</label>
+        <input type="date" id="d-start">
+        <span style="color:var(--text-sub);font-size:13px;">~</span>
+        <input type="date" id="d-end">
+        <button class="btn btn-primary" onclick="loadDashboard()">조회</button>
+        <button class="btn btn-ghost" onclick="resetDashboard()">초기화</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">청구 클레임</div><div class="stat-value" id="s-total">—</div></div>
+        <div class="stat-card"><div class="stat-label">수거 완료</div><div class="stat-value" id="s-ok">—</div></div>
+        <div class="stat-card"><div class="stat-label">미수거</div><div class="stat-value" id="s-fail">—</div></div>
+        <div class="stat-card"><div class="stat-label">스캔 총계</div><div class="stat-value" id="s-scan">—</div></div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn t-active" id="dt-all"  onclick="setDashFilter('all')">전체</button>
+        <button class="tab-btn" id="dt-ok"   onclick="setDashFilter('ok')">수거완료 ✓</button>
+        <button class="tab-btn" id="dt-fail" onclick="setDashFilter('fail')">미수거 ✗</button>
+      </div>
+      <div class="table-wrap">
+        <div class="loading" id="d-loading"><div class="spinner"></div>불러오는 중...</div>
+        <table id="d-table" style="display:none;">
+          <thead><tr>
+            <th>클레임번호 / 품번</th>
+            <th>차대번호(뒤7)</th>
+            <th>품명</th>
+            <th>작업자</th>
+            <th>교환일</th>
+            <th>수거</th>
+            <th>수거일자</th>
+            <th>비고</th>
+          </tr></thead>
+          <tbody id="d-body"></tbody>
+        </table>
+        <div class="empty" id="d-empty" style="display:none;">조회된 데이터가 없습니다.</div>
+      </div>
+    </div>
+
+    <!-- ── 관리 페이지 ── -->
+    <div class="page" id="page-admin">
+      <div class="filter-bar">
+        <label>기간</label>
+        <input type="date" id="a-start">
+        <span style="color:var(--text-sub);font-size:13px;">~</span>
+        <input type="date" id="a-end">
+        <button class="btn btn-primary" onclick="loadAdmin()">적용</button>
+        <button class="btn btn-ghost" onclick="fetchAdmin()">전체보기</button>
+      </div>
+      <div class="table-wrap">
+        <div class="loading" id="a-loading"><div class="spinner"></div>불러오는 중...</div>
+        <table id="a-table" style="display:none;">
+          <thead><tr>
+            <th style="width:30px;"><input type="checkbox" onclick="toggleAll(this)"></th>
+            <th>QR</th>
+            <th>차대번호</th>
+            <th>부품 정보</th>
+            <th>매칭 / 상태</th>
+            <th>기능</th>
+          </tr></thead>
+          <tbody id="a-body"></tbody>
+        </table>
+        <div class="empty" id="a-empty" style="display:none;">데이터가 없습니다.</div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
+<!-- 스캐너 모달 -->
+<div id="scanner-modal">
+  <div id="reader"></div>
+  <button class="btn" style="margin-top:20px; background:white;" onclick="closeScanner()">❌ 닫기</button>
+</div>
+
+<!-- 인쇄 영역 -->
+<div id="print-area"></div>
+
 <script>
-    const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SURL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
+const SKEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
+const sb = window.supabase.createClient(SURL, SKEY);
 
-    async function generateQR() {
-        if (typeof QRCode === 'undefined') { alert('라이브러리 로딩 중입니다.'); return; }
+let dashData = [];
+let adminData = [];
+let dashFilter = 'all';
+let html5QrCode;
 
-        const rowData = {
-            차대번호: document.getElementById('차대번호').value.trim(),
-            품번: document.getElementById('품번').value.trim(),
-            품명: document.getElementById('품명').value.trim(),
-            교환일: document.getElementById('교환일').value,
-            수량: parseInt(document.getElementById('수량').value) || 1,
-            작업자: document.getElementById('작업자').value.trim(),
-            수리항목: document.getElementById('수리항목').value.trim()
-        };
+// ── 날짜 기본값 ──
+const today   = new Date().toISOString().slice(0,10);
+const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
+document.getElementById('d-start').value = weekAgo;
+document.getElementById('d-end').value   = today;
 
-        if (!rowData.차대번호 || !rowData.품번 || !rowData.품명 || !rowData.교환일 || !rowData.작업자) {
-            alert('필수 항목(차대번호, 품번, 품명, 교환일, 작업자)을 입력해주세요.'); return;
-        }
+window.onload = () => { loadDashboard(); };
 
-        try {
-            const { data, error } = await sb.from('qr_returns').insert([rowData]).select();
-            if (error) throw error;
+// ══════════════════════════════
+//  페이지 전환
+// ══════════════════════════════
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
 
-            const resultPageUrl = `https://junhyeokki.github.io/qr-return-app/result.html?id=${data[0].id}`;
+  if (name === 'dashboard') {
+    document.getElementById('topbar-title').textContent = '📊 반납 현황';
+    document.getElementById('topbar-actions').innerHTML = '';
+    if (!dashData.length) loadDashboard();
+  } else if (name === 'admin') {
+    document.getElementById('topbar-title').textContent = '⚙️ QR 관리';
+    document.getElementById('topbar-actions').innerHTML = `
+      <button class="btn btn-excel" onclick="exportExcel()">📊 엑셀</button>
+      <button class="btn btn-primary" onclick="printSelected()">📄 병합 인쇄</button>
+    `;
+    if (!adminData.length) fetchAdmin();
+  }
+  closeSidebar();
+}
 
-            await QRCode.toCanvas(document.getElementById('qr-canvas'), resultPageUrl, { 
-                width: 240,
-                margin: 2
-            });
-            
-            document.getElementById('qr-result').style.display = 'block';
-            document.getElementById('success-msg').style.display = 'block';
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        } catch (e) {
-            alert('저장 실패: ' + e.message);
-        }
+// ══════════════════════════════
+//  현황 페이지
+// ══════════════════════════════
+async function loadDashboard() {
+  showLoading('d');
+  const start = document.getElementById('d-start').value;
+  const end   = document.getElementById('d-end').value;
+  let q = sb.from('qr_returns').select('*').order('created_at', { ascending: false });
+  if (start) q = q.gte('교환일', start);
+  if (end)   q = q.lte('교환일', end);
+  const { data } = await q;
+  dashData = data || [];
+  updateStats();
+  renderDash(dashFilter);
+}
+
+function resetDashboard() {
+  document.getElementById('d-start').value = weekAgo;
+  document.getElementById('d-end').value   = today;
+  loadDashboard();
+}
+
+function updateStats() {
+  const total = dashData.length;
+  const ok    = dashData.filter(d => d.bmw_qr_code).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-ok').textContent    = ok;
+  document.getElementById('s-fail').textContent  = total - ok;
+  document.getElementById('s-scan').textContent  = ok;
+}
+
+function setDashFilter(f) {
+  dashFilter = f;
+  ['all','ok','fail'].forEach(k => {
+    const el = document.getElementById('dt-'+k);
+    el.className = 'tab-btn';
+  });
+  if (f==='all')  document.getElementById('dt-all').classList.add('t-active');
+  if (f==='ok')   document.getElementById('dt-ok').classList.add('t-ok');
+  if (f==='fail') document.getElementById('dt-fail').classList.add('t-fail');
+  renderDash(f);
+}
+
+function renderDash(f) {
+  let rows = dashData;
+  if (f==='ok')   rows = dashData.filter(d => d.bmw_qr_code);
+  if (f==='fail') rows = dashData.filter(d => !d.bmw_qr_code);
+
+  document.getElementById('d-loading').style.display = 'none';
+  if (!rows.length) {
+    document.getElementById('d-table').style.display = 'none';
+    document.getElementById('d-empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('d-table').style.display = 'table';
+  document.getElementById('d-empty').style.display = 'none';
+
+  document.getElementById('d-body').innerHTML = rows.map(item => {
+    const isOk = !!item.bmw_qr_code;
+    let collectDate = '';
+    if (isOk) {
+      const f = item.bmw_qr_code.split(',');
+      if (f.length >= 8 && f[7]?.length === 6)
+        collectDate = `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`;
+      if (!collectDate && item.created_at) collectDate = item.created_at.slice(0,10);
     }
+    return `<tr>
+      <td><div class="claim-no">${item.id.slice(0,8).toUpperCase()}</div><div class="part-code" style="margin-top:2px;color:var(--text-sub);">${item.품번}</div></td>
+      <td><span class="vin">${item.차대번호.slice(-7)}</span></td>
+      <td>${item.품명}</td>
+      <td style="color:var(--text-sub);">${item.작업자}</td>
+      <td>${item.교환일||''}</td>
+      <td>${isOk ? '<span class="badge badge-ok">✓ 수거완료</span>' : '<span class="badge badge-fail">✗ 미수거</span>'}</td>
+      <td>${collectDate ? `<span class="date-ok">${collectDate}</span>` : '<span class="dash">—</span>'}</td>
+      <td>${!isOk ? '<span class="memo">고품 미수거</span>' : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════
+//  관리 페이지
+// ══════════════════════════════
+async function fetchAdmin() {
+  showLoading('a');
+  const { data } = await sb.from('qr_returns').select('*').order('created_at', { ascending: false });
+  adminData = data || [];
+  renderAdmin(adminData);
+}
+
+async function loadAdmin() {
+  showLoading('a');
+  const start = document.getElementById('a-start').value;
+  const end   = document.getElementById('a-end').value;
+  if (!start || !end) { fetchAdmin(); return; }
+  const filtered = adminData.filter(i => i.교환일 >= start && i.교환일 <= end);
+  renderAdmin(filtered);
+}
+
+function renderAdmin(data) {
+  document.getElementById('a-loading').style.display = 'none';
+  if (!data.length) {
+    document.getElementById('a-table').style.display = 'none';
+    document.getElementById('a-empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('a-table').style.display = 'table';
+  document.getElementById('a-empty').style.display = 'none';
+
+  document.getElementById('a-body').innerHTML = data.map(item => `
+    <tr id="row-${item.id}">
+      <td><input type="checkbox" class="row-check" value="${item.id}"></td>
+      <td><img style="width:46px;border-radius:4px;" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}"></td>
+      <td><span class="vin">${item.차대번호}</span></td>
+      <td><strong>${item.품번}</strong><br><span style="font-size:12px;color:var(--text-sub);">${item.품명}</span></td>
+      <td id="mc-${item.id}">
+        <div class="match-cell">
+          ${item.bmw_qr_code
+            ? '<span class="badge badge-ok">✅ 수거 완료</span>'
+            : `<button class="btn-match" onclick="startScan('${item.id}','${item.차대번호}','${item.품번}')">🔗 출고서 매칭</button>`
+          }
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-print" onclick="printSingle('${item.id}')">인쇄</button>
+          <button class="btn-del"   onclick="deleteItem('${item.id}')">삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ══════════════════════════════
+//  스캐너 / 매칭
+// ══════════════════════════════
+function startScan(id, originVin, originPart) {
+  document.getElementById('scanner-modal').style.display = 'flex';
+  html5QrCode = new Html5Qrcode("reader");
+  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (decodedText) => {
+    const f = decodedText.split(',');
+    if (f.length < 12) return alert("올바른 공식 QR 형식이 아닙니다.");
+    const scVin  = f[2];
+    const scPart = f[9];
+    const isVinMatch  = originVin.includes(scVin) || scVin.includes(originVin.slice(-7));
+    const isPartMatch = originPart.replace(/[^a-zA-Z0-9]/g,'') === scPart.replace(/[^a-zA-Z0-9]/g,'');
+
+    if (isVinMatch && isPartMatch) {
+      if (confirm(`[판독 결과: 일치]\n수거 완료 처리하시겠습니까?`)) {
+        const { error } = await sb.from('qr_returns').update({
+          bmw_qr_code: decodedText,
+          차대번호: scVin,
+          품번: scPart,
+          교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`
+        }).eq('id', id);
+
+        if (error) {
+          alert("업데이트 실패: " + error.message);
+        } else {
+          closeScanner();
+          // 애니메이션 뱃지 표시
+          const mc = document.getElementById(`mc-${id}`);
+          if (mc) {
+            const cellDiv = mc.querySelector('.match-cell');
+            const btn = cellDiv.querySelector('.btn-match');
+            const badge = document.createElement('span');
+            badge.className = 'badge-success-anim';
+            badge.innerHTML = '<span class="ck">✓</span> 수거 완료';
+            if (btn) {
+              btn.insertAdjacentElement('afterend', badge);
+              setTimeout(() => {
+                btn.style.transition = 'opacity 0.3s';
+                btn.style.opacity = '0';
+                setTimeout(() => btn.remove(), 300);
+              }, 600);
+            } else { cellDiv.appendChild(badge); }
+          }
+          const row = document.getElementById(`row-${id}`);
+          if (row) row.classList.add('row-matched');
+          // 현황 데이터도 동기화
+          const item = adminData.find(i => String(i.id) === String(id));
+          if (item) item.bmw_qr_code = decodedText;
+          dashData = []; // 현황 페이지 재조회 유도
+        }
+      }
+    } else {
+      alert(`⚠️ 정보 불일치!\n기존: ${originVin} / ${originPart}\n스캔: ${scVin} / ${scPart}`);
+      closeScanner();
+    }
+  });
+}
+
+function closeScanner() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      document.getElementById('scanner-modal').style.display = 'none';
+      html5QrCode = null;
+    }).catch(console.error);
+  } else {
+    document.getElementById('scanner-modal').style.display = 'none';
+  }
+}
+
+// ══════════════════════════════
+//  엑셀 / 인쇄
+// ══════════════════════════════
+function exportExcel() {
+  const ws = XLSX.utils.json_to_sheet(adminData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Returns");
+  XLSX.utils.writeFile(wb, `BMW_Returns_${today}.xlsx`);
+}
+
+function printSingle(id) {
+  const item = adminData.find(i => String(i.id) === String(id));
+  if (!item) return;
+  document.getElementById('print-area').innerHTML = makeLabelHtml(item);
+  document.getElementById('print-area').style.display = 'grid';
+  setTimeout(() => { window.print(); document.getElementById('print-area').style.display = 'none'; }, 300);
+}
+
+function printSelected() {
+  const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(c => c.value);
+  if (!ids.length) return alert("항목을 선택하세요.");
+  const targets = adminData.filter(i => ids.includes(String(i.id)));
+  document.getElementById('print-area').innerHTML = targets.map(makeLabelHtml).join('');
+  document.getElementById('print-area').style.display = 'grid';
+  setTimeout(() => { window.print(); document.getElementById('print-area').style.display = 'none'; }, 500);
+}
+
+function makeLabelHtml(item) {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${item.id}`;
+  return `<div class="label-card"><div class="qr-side"><img src="${qrUrl}"></div><div class="info-side"><div style="font-size:12px;font-weight:700;">날짜: ${item.교환일} / 작업자: ${item.작업자}</div><div style="font-size:12px;font-weight:700;margin-top:2px;">품명: ${item.품명}</div><div class="data-box"><div style="font-size:9px;font-weight:bold;">PART NUMBER</div><div class="val-text">${item.품번}</div><div style="font-size:9px;font-weight:bold;margin-top:5px;">VIN (LAST 7)</div><div class="val-text">${item.차대번호.slice(-7)}</div></div></div></div>`;
+}
+
+async function deleteItem(id) {
+  if (confirm("정말 삭제하시겠습니까?")) {
+    await sb.from('qr_returns').delete().eq('id', id);
+    fetchAdmin();
+  }
+}
+
+function toggleAll(src) { document.querySelectorAll('.row-check').forEach(c => c.checked = src.checked); }
+
+// ══════════════════════════════
+//  유틸
+// ══════════════════════════════
+function showLoading(prefix) {
+  document.getElementById(prefix+'-loading').style.display = 'block';
+  document.getElementById(prefix+'-table').style.display   = 'none';
+  document.getElementById(prefix+'-empty').style.display   = 'none';
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
 </script>
 </body>
 </html>
