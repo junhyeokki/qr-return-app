@@ -376,6 +376,14 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
         <button class="btn btn-p" onclick="loadDash()">조회</button>
         <button class="btn btn-g" onclick="resetDash()">초기화</button>
       </div>
+      <div class="frow" style="margin-bottom:14px;">
+        <span class="flbl">검색</span>
+        <input class="finput" type="text" id="d-search"
+          placeholder="차대번호, 품번, 품명, 작업자, RO번호..."
+          oninput="searchDash(this.value)"
+          style="flex:1; min-width:200px;">
+        <button class="btn btn-g" onclick="document.getElementById('d-search').value=''; searchDash('');">✕</button>
+      </div>
       <div class="stats">
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">청구 클레임</div><div class="sc-val" id="sv-t">—</div><div class="sc-bg">📦</div></div>
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">수거 완료</div><div class="sc-val" id="sv-ok">—</div><div class="sc-bg">✅</div></div>
@@ -473,6 +481,14 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
         <input class="finput" type="date" id="ae">
         <button class="btn btn-p" onclick="filterAdmin()">적용</button>
         <button class="btn btn-g" onclick="fetchAdmin()">전체보기</button>
+      </div>
+      <div class="frow" style="margin-bottom:14px;">
+        <span class="flbl">검색</span>
+        <input class="finput" type="text" id="a-search"
+          placeholder="차대번호, 품번, 품명, 작업자, RO번호..."
+          oninput="searchAdmin(this.value)"
+          style="flex:1; min-width:200px;">
+        <button class="btn btn-g" onclick="document.getElementById('a-search').value=''; searchAdmin('');">✕</button>
       </div>
       <div class="tw">
         <div class="loading" id="al"><div class="spinner"></div>불러오는 중...</div>
@@ -716,6 +732,27 @@ async function loadDash(){
   renderDash(DF);
 }
 function resetDash(){ document.getElementById('ds').value=w7; document.getElementById('de').value=today; loadDash(); }
+/* ── 검색 공통 필터 ── */
+function matchSearch(r, q){
+  if(!q) return true;
+  const kw = q.toLowerCase();
+  return [r.차대번호, r.품번, r.품명, r.작업자, r.ro번호, r.클레임번호, r.수리항목]
+    .some(v => v && String(v).toLowerCase().includes(kw));
+}
+
+function searchDash(q){
+  let rows = DD;
+  if(DF==='ok')   rows = DD.filter(d=>d.bmw_qr_code);
+  if(DF==='fail') rows = DD.filter(d=>!d.bmw_qr_code);
+  const filtered = rows.filter(r => matchSearch(r, q));
+  renderDashRows(filtered);
+}
+
+function searchAdmin(q){
+  const filtered = AD.filter(r => matchSearch(r, q));
+  renderAdmin(filtered);
+}
+
 function setDF(f){
   DF=f;
   ['all','ok','fail'].forEach(k=>document.getElementById('dt-'+k).className='tab');
@@ -726,6 +763,13 @@ function renderDash(f){
   let rows=DD;
   if(f==='ok')   rows=DD.filter(d=>d.bmw_qr_code);
   if(f==='fail') rows=DD.filter(d=>!d.bmw_qr_code);
+  // 검색어 적용
+  const q = document.getElementById('d-search')?.value || '';
+  if(q) rows = rows.filter(r => matchSearch(r, q));
+  renderDashRows(rows);
+}
+
+function renderDashRows(rows){
   hL('d');
   if(!rows.length){ document.getElementById('de2').style.display='block'; return; }
   document.getElementById('dt').style.display='table';
