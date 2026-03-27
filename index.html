@@ -968,6 +968,19 @@ function closeScanner(){
 }
 
 /* ── 엑셀/인쇄 ── */
+/* ── 엑셀 다운로드 공통 (모바일 호환) ── */
+function downloadExcel(wb, filename){
+  const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const blob  = new Blob([wbout], { type:'application/octet-stream' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 300);
+}
+
 function exportDashExcel(){
   if(!DD.length){ alert('조회된 데이터가 없습니다.'); return; }
   // 현황 데이터를 보기 좋게 가공
@@ -1005,12 +1018,12 @@ function exportDashExcel(){
   XLSX.utils.book_append_sheet(wb, ws, '반납현황');
   const s = document.getElementById('ds').value;
   const e = document.getElementById('de').value;
-  XLSX.utils.writeFile(wb, `고품반납현황_${s}_${e}.xlsx`);
+  downloadExcel(wb, `고품반납현황_${s}_${e}.xlsx`);
 }
 function exportExcel(){
   const ws=XLSX.utils.json_to_sheet(AD),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Returns");
-  XLSX.utils.writeFile(wb,`BMW_Returns_${today}.xlsx`);
+  downloadExcel(wb, `BMW_Returns_${today}.xlsx`);
 }
 function printSingle(id){
   const item=AD.find(i=>String(i.id)===String(id)); if(!item)return;
