@@ -1,69 +1,282 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>반납 정보 확인</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; min-height: 100vh; align-items: flex-start; }
-        .card { background: white; width: 100%; max-width: 400px; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-top: 20px; }
-        .header { background: #3ecf8e; color: white; padding: 24px; text-align: center; }
-        .header h2 { margin: 0; font-size: 20px; letter-spacing: -0.5px; }
-        .content { padding: 24px; }
-        .info-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
-        .info-row:last-child { border-bottom: none; }
-        .label { color: #8e8e93; font-size: 14px; font-weight: 500; }
-        .value { font-weight: 600; color: #1c1c1e; text-align: right; font-size: 15px; }
-        .loading { text-align: center; padding: 60px; color: #8e8e93; font-size: 14px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고품 상세 정보</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #111318;
+  --surf:    #191c24;
+  --surf2:   #1f2330;
+  --border:  rgba(255,255,255,0.06);
+  --text:    #f0f1f5;
+  --dim:     rgba(240,241,245,0.38);
+  --dim2:    rgba(240,241,245,0.6);
+  --p:       #f5a623;
+  --p-dim:   rgba(245,166,35,0.12);
+  --ok:      #34c48a;
+  --ok-dim:  rgba(52,196,138,0.12);
+  --fail:    #f06060;
+  --fail-dim:rgba(240,96,96,0.12);
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+}
+html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+.topbar {
+  background: var(--surf);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+}
+.topbar-brand { font-size: 15px; font-weight: 900; color: var(--p); }
+.topbar-sub   { font-size: 11px; color: var(--dim); }
+
+.container { max-width: 480px; margin: 0 auto; padding: 24px 16px 40px; }
+
+/* 상태 카드 */
+.status-card {
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.status-card.ok   { background: var(--ok-dim);   border: 1px solid rgba(52,196,138,0.2); }
+.status-card.fail { background: var(--fail-dim);  border: 1px solid rgba(240,96,96,0.2); }
+.status-card.load { background: var(--surf);      border: 1px solid var(--border); }
+
+.status-icon  { font-size: 42px; margin-bottom: 10px; }
+.status-label { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
+.status-card.ok   .status-label { color: var(--ok); }
+.status-card.fail .status-label { color: var(--fail); }
+.status-date  { font-family: var(--mono); font-size: 12px; color: var(--dim2); margin-top: 6px; }
+
+/* 정보 카드 */
+.info-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.info-card-title {
+  padding: 14px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-key {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim);
+  width: 80px;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+.info-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.info-val.mono { font-family: var(--mono); font-size: 13px; color: var(--p); }
+.info-val.dim  { color: var(--dim2); font-weight: 400; }
+
+/* 태그 */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.tok   { background: var(--ok-dim);   color: var(--ok);   border: 1px solid rgba(52,196,138,0.2); }
+.tfail { background: var(--fail-dim); color: var(--fail); border: 1px solid rgba(240,96,96,0.2); }
+.tdot  { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* 경과일 */
+.elapsed-bar {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.elapsed-bar .e-label { font-size: 12px; color: var(--dim2); font-weight: 600; }
+.elapsed-chip {
+  font-family: var(--mono); font-size: 12px; font-weight: 800;
+  padding: 4px 12px; border-radius: 8px;
+}
+.e-ok     { background: rgba(240,241,245,0.05); color: var(--dim2); }
+.e-warn   { background: rgba(245,166,35,0.15);  color: var(--p); }
+.e-danger { background: rgba(240,96,96,0.15);   color: var(--fail); }
+
+/* 로딩 */
+.loading {
+  text-align: center; padding: 60px 20px; color: var(--dim);
+}
+.spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border); border-top-color: var(--p);
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.error-box {
+  text-align: center; padding: 50px 20px;
+  color: var(--fail); font-size: 14px;
+}
+.error-box .e-icon { font-size: 40px; margin-bottom: 12px; }
+</style>
 </head>
 <body>
-    <div class="card" id="main-card">
-        <div class="header">
-            <h2>고품 반납 정보</h2>
-        </div>
-        <div class="content" id="info-content">
-            <div class="loading">데이터를 불러오는 중...</div>
-        </div>
+
+<div class="topbar">
+  <div class="topbar-brand">📦 고품 반납</div>
+  <div class="topbar-sub">BMW 부품 관리 시스템 · 전주점</div>
+</div>
+
+<div class="container">
+  <div id="content">
+    <div class="loading">
+      <div class="spinner"></div>
+      데이터 불러오는 중...
     </div>
+  </div>
+</div>
 
 <script>
-    const SUPABASE_URL = 'https://dgmmcypqrqciuoqvmymj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SURL='https://dgmmcypqrqciuoqvmymj.supabase.co';
+const SKEY='sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao';
+const sb=window.supabase.createClient(SURL,SKEY);
 
-    async function loadData() {
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get('id');
+window.onload = async function(){
+  const id = new URLSearchParams(location.search).get('id');
+  if(!id){ showError('잘못된 접근입니다.'); return; }
 
-        if (!id) {
-            document.getElementById('info-content').innerHTML = "<div style='text-align:center; padding:40px; color:#ff3b30;'>잘못된 접근입니다.</div>";
-            return;
-        }
+  const { data, error } = await sb.from('qr_returns').select('*').eq('id', id).single();
+  if(error || !data){ showError('데이터를 찾을 수 없습니다.'); return; }
 
-        const { data, error } = await sb.from('qr_returns').select('*').eq('id', id).single();
+  render(data);
+};
 
-        if (error || !data) {
-            document.getElementById('info-content').innerHTML = "<div style='text-align:center; padding:40px; color:#ff3b30;'>정보를 찾을 수 없습니다.</div>";
-            return;
-        }
+function render(r){
+  const ok = !!r.bmw_qr_code;
 
-        // 출력할 필드 리스트 (순서 조정 가능)
-        const fields = ['차대번호', '품번', '품명', '교환일', '수량', '작업자', '수리항목'];
-        let html = '';
-        fields.forEach(field => {
-            html += `
-                <div class="info-row">
-                    <span class="label">${field}</span>
-                    <span class="value">${data[field] || '-'}</span>
-                </div>
-            `;
-        });
-        document.getElementById('info-content').innerHTML = html;
-    }
+  // 수거일 파싱
+  let collectDate = '';
+  if(ok && r.bmw_qr_code){
+    const f = r.bmw_qr_code.split(',');
+    if(f[7]?.length===6) collectDate=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`;
+    if(!collectDate && r.created_at) collectDate=r.created_at.slice(0,10);
+  }
 
-    loadData();
+  // 경과일 계산
+  const days = Math.floor((Date.now()-new Date(r.created_at))/86400000);
+  const elapsedCls  = days>=7?'e-danger':days>=3?'e-warn':'e-ok';
+  const elapsedText = days===0?'오늘 등록':`${days}일 경과`;
+
+  document.getElementById('content').innerHTML = `
+
+    <!-- 수거 상태 카드 -->
+    <div class="status-card ${ok?'ok':'fail'}">
+      <div class="status-icon">${ok?'✅':'⏳'}</div>
+      <div class="status-label">${ok?'수거 완료':'미수거'}</div>
+      ${ok && collectDate ? `<div class="status-date">수거일: ${collectDate}</div>` : ''}
+      ${!ok ? `<div class="status-date">등록일: ${r.created_at?.slice(0,10)||''}</div>` : ''}
+    </div>
+
+    <!-- 경과일 -->
+    ${!ok ? `
+    <div class="elapsed-bar">
+      <span class="e-label">📅 미수거 경과</span>
+      <span class="elapsed-chip ${elapsedCls}">${elapsedText}</span>
+    </div>` : ''}
+
+    <!-- 클레임 정보 -->
+    <div class="info-card">
+      <div class="info-card-title">클레임 정보</div>
+      <div class="info-row">
+        <div class="info-key">클레임번호</div>
+        <div class="info-val mono">${r.클레임번호||'—'}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">RO번호</div>
+        <div class="info-val mono">${r.ro번호||'—'}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">수리항목</div>
+        <div class="info-val ${r.수리항목?'':'dim'}">${r.수리항목||'—'}</div>
+      </div>
+    </div>
+
+    <!-- 부품 정보 -->
+    <div class="info-card">
+      <div class="info-card-title">부품 정보</div>
+      <div class="info-row">
+        <div class="info-key">품번</div>
+        <div class="info-val mono">${r.품번}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">품명</div>
+        <div class="info-val">${r.품명}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">수량</div>
+        <div class="info-val">${r.수량||1}개</div>
+      </div>
+    </div>
+
+    <!-- 차량 정보 -->
+    <div class="info-card">
+      <div class="info-card-title">차량 / 작업 정보</div>
+      <div class="info-row">
+        <div class="info-key">차대번호</div>
+        <div class="info-val mono">${r.차대번호}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">교환일</div>
+        <div class="info-val">${r.교환일||'—'}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-key">작업자</div>
+        <div class="info-val">${r.작업자}</div>
+      </div>
+    </div>
+
+  `;
+}
+
+function showError(msg){
+  document.getElementById('content').innerHTML = `
+    <div class="error-box">
+      <div class="e-icon">❌</div>
+      <div>${msg}</div>
+    </div>`;
+}
 </script>
 </body>
 </html>
