@@ -34,6 +34,13 @@
 html, body { height: 100%; }
 body { font-family: var(--sans); background: var(--bg); color: var(--text); display: flex; overflow: hidden; }
 
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-6px)}
+  80%{transform:translateX(6px)}
+}
 .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:90; backdrop-filter:blur(2px); }
 .overlay.show { display:block; }
 
@@ -294,6 +301,42 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
 </head>
 <body>
 
+<!-- ── 로그인 화면 ── -->
+<div id="login-screen" style="
+  display:flex; position:fixed; inset:0; z-index:9999;
+  background:var(--bg); justify-content:center; align-items:center; padding:20px;
+">
+  <div style="
+    background:var(--surf); border:1px solid var(--border); border-radius:20px;
+    padding:40px 36px; width:100%; max-width:380px;
+  ">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:36px; margin-bottom:12px;">📦</div>
+      <div style="font-size:20px; font-weight:900; color:var(--p); letter-spacing:-0.5px;">고품 반납 시스템</div>
+      <div style="font-size:12px; color:var(--dim); margin-top:6px;">BMW 부품 관리 · 전주점</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="display:block; font-size:10px; font-weight:700; color:var(--dim); margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">이메일</label>
+      <input id="login-email" type="email" placeholder="example@email.com"
+        style="width:100%; padding:11px 14px; background:var(--surf2); border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:var(--sans); color:var(--text); outline:none;"
+        onkeydown="if(event.key==='Enter') document.getElementById('login-pw').focus()">
+    </div>
+    <div style="margin-bottom:24px;">
+      <label style="display:block; font-size:10px; font-weight:700; color:var(--dim); margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">비밀번호</label>
+      <input id="login-pw" type="password" placeholder="••••••••"
+        style="width:100%; padding:11px 14px; background:var(--surf2); border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:var(--sans); color:var(--text); outline:none;"
+        onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button onclick="doLogin()" style="
+      width:100%; padding:13px; background:var(--p); color:#111; border:none; border-radius:10px;
+      font-size:15px; font-weight:800; font-family:var(--sans); cursor:pointer; transition:all 0.2s;
+    ">로그인</button>
+    <div id="login-err" style="margin-top:12px; text-align:center; font-size:12px; color:var(--fail); display:none;">
+      이메일 또는 비밀번호가 올바르지 않습니다.
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
 
 <!-- 사이드바 -->
@@ -305,7 +348,10 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
   <button class="nav on" id="nb-dash"  onclick="goPage('dash')"> <span class="ico">📊</span> 반납 현황</button>
   <button class="nav"    id="nb-qr"    onclick="goPage('qr')">   <span class="ico">🔲</span> QR 생성</button>
   <button class="nav"    id="nb-admin" onclick="goPage('admin')"><span class="ico">⚙️</span> QR 관리</button>
-  <div class="sb-footer">전주점 · junhyeokki</div>
+  <div class="sb-footer" style="display:flex; justify-content:space-between; align-items:center;">
+    <span>전주점 · junhyeokki</span>
+    <button onclick="doLogout()" style="background:none; border:1px solid var(--border); color:var(--dim); font-size:10px; font-weight:700; border-radius:5px; padding:3px 8px; cursor:pointer; font-family:var(--sans);">로그아웃</button>
+  </div>
 </div>
 
 <!-- 메인 -->
@@ -524,7 +570,37 @@ const w7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
 document.getElementById('ds').value=w7;
 document.getElementById('de').value=today;
 document.getElementById('q-date').value=today;
-window.onload=loadDash;
+/* ── 로그인/로그아웃 ── */
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-err');
+  errEl.style.display='none';
+  if(!email||!pw){ errEl.style.display='block'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if(error){
+    errEl.style.display='block';
+  } else {
+    document.getElementById('login-screen').style.display='none';
+    loadDash();
+  }
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+/* ── 세션 체크 ── */
+async function checkSession(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){
+    document.getElementById('login-screen').style.display='none';
+    loadDash();
+  }
+  // 세션 없으면 로그인 화면 유지
+}
+
+window.onload=checkSession;
 
 /* ── 사이드바 ── */
 function toggleSidebar(){ document.getElementById('sidebar').classList.toggle('open'); document.getElementById('overlay').classList.toggle('show'); }
@@ -586,7 +662,7 @@ async function generateQR(){
 
 /* ── 텔레그램 알림 ── */
 async function sendTelegramAlert(item, id){
-  const BOT_TOKEN = '8661698521:AAGZc8cL5liR9ww32sbO8syMA-rw5dKfGys';  // ← 새로 발급받은 토큰 입력
+  const BOT_TOKEN = '여기에봇토큰입력';  // ← 새로 발급받은 토큰 입력
   const CHAT_ID   = '8761728345';
   const msg = [
     '📦 *고품 QR 생성 알림*',
