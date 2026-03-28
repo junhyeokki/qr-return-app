@@ -560,6 +560,31 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
         </div>
       </div>
       <div class="empty" id="st-empty" style="display:none;">디펙트코드가 있는 데이터가 없습니다. 출고서 매칭 후 확인해 주세요.</div>
+
+      <!-- 품번 TOP 10 -->
+      <div style="margin-top:24px;">
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:12px;letter-spacing:-0.3px;">🏆 품번 청구 TOP 10</div>
+        <div id="top10-chart-wrap" style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;display:none;">
+          <canvas id="top10-chart" style="max-height:320px;"></canvas>
+        </div>
+        <div id="top10-table-wrap" style="display:none;">
+          <div class="tw">
+            <div class="table-scroll">
+              <table style="min-width:360px;">
+                <thead><tr>
+                  <th style="width:40px;">순위</th>
+                  <th>품번</th>
+                  <th>품명</th>
+                  <th style="text-align:center;">청구건수</th>
+                  <th style="text-align:center;">비율</th>
+                </tr></thead>
+                <tbody id="top10-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="empty" id="top10-empty" style="display:none;">품번 데이터가 없습니다.</div>
+      </div>
     </div>
 
   </div>
@@ -1163,17 +1188,18 @@ function sL(p){ document.getElementById(p+'l').style.display='block'; document.g
 function hL(p){ document.getElementById(p+'l').style.display='none'; }
 
 /* ── 통계 ── */
-let SD=[]; let statsChart=null;
+let SD=[]; let statsChart=null; let top10Chart=null;
 
 async function loadStats(){
   document.getElementById('stl').style.display='block';
   const s=document.getElementById('sts').value, e=document.getElementById('ste').value;
-  let q=sb.from('qr_returns').select('교환일,디펙트코드,bmw_qr_code,created_at').order('교환일');
+  let q=sb.from('qr_returns').select('교환일,디펙트코드,bmw_qr_code,created_at,품번,품명').order('교환일');
   if(s) q=q.gte('교환일',s);
   if(e) q=q.lte('교환일',e);
   const{data}=await q; SD=data||[];
   document.getElementById('stl').style.display='none';
   renderStats();
+  renderTop10();
 }
 
 function resetStats(){
@@ -1267,6 +1293,74 @@ function renderStatsTable(periods,codes,matrix,mode){
       <td style="text-align:center;font-weight:700;color:var(--p);">${total}</td>
     </tr>`;
   }).join('');
+}
+
+function renderTop10(){
+  if(!SD.length){
+    document.getElementById('top10-empty').style.display='block';
+    document.getElementById('top10-chart-wrap').style.display='none';
+    document.getElementById('top10-table-wrap').style.display='none';
+    return;
+  }
+  // 품번별 집계
+  const map={};
+  SD.forEach(r=>{
+    if(!r.품번) return;
+    if(!map[r.품번]) map[r.품번]={품번:r.품번, 품명:r.품명||'', count:0};
+    map[r.품번].count++;
+  });
+  const sorted=Object.values(map).sort((a,b)=>b.count-a.count).slice(0,10);
+  if(!sorted.length){
+    document.getElementById('top10-empty').style.display='block';
+    document.getElementById('top10-chart-wrap').style.display='none';
+    document.getElementById('top10-table-wrap').style.display='none';
+    return;
+  }
+  document.getElementById('top10-empty').style.display='none';
+  document.getElementById('top10-chart-wrap').style.display='block';
+  document.getElementById('top10-table-wrap').style.display='block';
+
+  const total=SD.filter(r=>r.품번).length;
+
+  // 차트
+  const ctx=document.getElementById('top10-chart').getContext('2d');
+  if(top10Chart) top10Chart.destroy();
+  top10Chart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:sorted.map(r=>r.품번),
+      datasets:[{
+        label:'청구건수',
+        data:sorted.map(r=>r.count),
+        backgroundColor:sorted.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]),
+        borderRadius:6,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x}건`}}
+      },
+      scales:{
+        x:{beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}},
+        y:{ticks:{color:'rgba(240,241,245,0.7)',font:{family:"'JetBrains Mono'",size:11}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+
+  // 테이블
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('top10-body').innerHTML=sorted.map((r,i)=>`
+    <tr>
+      <td style="text-align:center;font-size:16px;">${medals[i]||`${i+1}`}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${r.품번}</td>
+      <td style="font-size:12px;">${r.품명}</td>
+      <td style="text-align:center;font-weight:700;color:var(--p);">${r.count}</td>
+      <td style="text-align:center;font-size:12px;color:var(--dim2);">${Math.round(r.count/total*100)}%</td>
+    </tr>`).join('');
 }
 
 function exportStatsExcel(){
