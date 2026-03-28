@@ -408,6 +408,7 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
               <th>클레임번호 / RO번호</th>
               <th>차대번호(뒤7)</th>
               <th>품명 / 품번</th>
+              <th>디펙트코드</th>
               <th>작업자</th>
               <th>교환일</th>
               <th>수거 상태</th>
@@ -466,6 +467,10 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
               <input type="text" id="q-repair" placeholder="리콜 수리">
             </div>
           </div>
+          <div class="field">
+            <label>디펙트코드</label>
+            <input type="text" id="q-defect" placeholder="디펙트 번호 입력" oninput="this.value=this.value.toUpperCase()">
+          </div>
 
           <button class="qr-submit" onclick="generateQR()">QR 생성 및 저장</button>
           <div class="success-msg" id="q-success">✅ 서버 저장 완료!</div>
@@ -504,6 +509,7 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
               <th>QR</th>
               <th>클레임번호 / RO번호</th>
               <th>차대번호 / 품번</th>
+              <th>디펙트코드</th>
               <th>매칭 / 상태</th>
               <th>액션</th>
             </tr></thead>
@@ -663,7 +669,8 @@ async function generateQR(){
     교환일:     document.getElementById('q-date').value,
     수량:       parseInt(document.getElementById('q-qty').value)||1,
     작업자:     document.getElementById('q-worker').value.trim(),
-    수리항목:   document.getElementById('q-repair').value.trim()
+    수리항목:   document.getElementById('q-repair').value.trim(),
+    디펙트코드: document.getElementById('q-defect').value.trim() || null
   };
   if(!rowData.ro번호||!rowData.차대번호||!rowData.품번||!rowData.품명||!rowData.교환일||!rowData.작업자){
     alert('필수 항목(RO번호, 차대번호, 품번, 품명, 교환일, 작업자)을 입력해주세요.'); return;
@@ -683,9 +690,7 @@ async function generateQR(){
 
 /* ── 텔레그램 알림 ── */
 async function sendTelegramCollected(item, scan){
-  const BOT_TOKEN = document.querySelector('script[data-bot]')?.dataset.bot || '';
-  // BOT_TOKEN을 sendTelegramAlert와 동일하게 가져오기 위해 공통 함수 사용
-  const CHAT_ID = '8761728345';
+  const { CHAT_ID } = getTelegramConfig();
   const msg = [
     '✅ *수거 완료 알림*',
     '',
@@ -706,15 +711,16 @@ async function sendTelegramCollected(item, scan){
   } catch(e){ console.warn('텔레그램 수거완료 알림 실패:', e); }
 }
 
-/* ── 텔레그램 알림 ── */
-function getTelegramToken(){
-  // 봇 토큰을 여기에 입력하세요
-  return '여기에봇토큰입력';
+/* ── 텔레그램 설정 (아래 두 값을 실제 값으로 교체하세요) ── */
+function getTelegramConfig(){
+  const BOT_TOKEN = '';   // 예: '1234567890:ABC-...'
+  const CHAT_ID   = '';   // 예: '123456789'
+  return { BOT_TOKEN, CHAT_ID };
 }
+function getTelegramToken(){ return getTelegramConfig().BOT_TOKEN; }
 
 async function sendTelegramAlert(item, id){
-  const BOT_TOKEN = getTelegramToken();
-  const CHAT_ID   = '8761728345';
+  const { BOT_TOKEN, CHAT_ID } = getTelegramConfig();
   const msg = [
     '📦 *고품 QR 생성 알림*',
     '',
@@ -809,8 +815,9 @@ function renderDashRows(rows){
   if(!rows.length){ document.getElementById('de2').style.display='block'; return; }
   document.getElementById('dt').style.display='table';
   document.getElementById('db').innerHTML=rows.map(r=>{
-    const ok=!!r.bmw_qr_code; let cd='';
-    if(ok){ const f=r.bmw_qr_code.split(','); if(f[7]?.length===6) cd=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`; if(!cd&&r.created_at) cd=r.created_at.slice(0,10); }
+    const ok=!!r.bmw_qr_code; let cd=''; let dc='';
+    if(ok){ const f=r.bmw_qr_code.split(','); if(f[7]?.length===6) cd=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`; if(!cd&&r.created_at) cd=r.created_at.slice(0,10); dc=f[4]||''; }
+    const defectCode = r.디펙트코드 || dc;
     const elapsedHtml = !ok ? elapsedTag(r.created_at) : '';
     const days = !ok ? Math.floor((Date.now()-new Date(r.created_at))/86400000) : 0;
     const rowCls = !ok && days>=7 ? 'row-danger' : !ok && days>=3 ? 'row-warn' : '';
@@ -821,6 +828,7 @@ function renderDashRows(rows){
       </td>
       <td><span class="vin-val">${r.차대번호.slice(-7)}</span></td>
       <td><div style="font-weight:700;font-size:13px;">${r.품명}</div><div class="pn-val">${r.품번}</div></td>
+      <td style="font-family:var(--mono);font-size:12px;">${defectCode||'<span style="color:var(--dim)">—</span>'}</td>
       <td style="font-size:12px;color:var(--dim2);">${r.작업자}</td>
       <td style="font-family:var(--mono);font-size:12px;">${r.교환일||''}</td>
       <td>
@@ -847,7 +855,9 @@ function renderAdmin(data){
   hL('a');
   if(!data.length){ document.getElementById('ae2').style.display='block'; return; }
   document.getElementById('at').style.display='table';
-  document.getElementById('ab').innerHTML=data.map(r=>`
+  document.getElementById('ab').innerHTML=data.map(r=>{
+    const adc = r.디펙트코드 || (r.bmw_qr_code ? (r.bmw_qr_code.split(',')[4]||'') : '');
+    return `
     ${(()=>{ const d=!r.bmw_qr_code?Math.floor((Date.now()-new Date(r.created_at))/86400000):0; const rc=!r.bmw_qr_code&&d>=7?'row-danger':!r.bmw_qr_code&&d>=3?'row-warn':''; return `<tr id="row-${r.id}" class="${rc}">`; })()}
       <td><input type="checkbox" class="row-check" value="${r.id}" style="accent-color:var(--p);"></td>
       <td><img style="width:42px;border-radius:6px;border:1px solid var(--border);" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${r.id}"></td>
@@ -859,6 +869,7 @@ function renderAdmin(data){
         <div class="vin-val" style="font-size:12px;">${r.차대번호}</div>
         <div class="pn-val">${r.품번}</div>
       </td>
+      <td style="font-family:var(--mono);font-size:12px;">${adc||'<span style="color:var(--dim)">—</span>'}</td>
       <td id="mc-${r.id}"><div class="mc">
         ${r.bmw_qr_code
           ?'<span class="tag tok"><span class="tdot"></span>수거 완료</span>'
@@ -871,7 +882,8 @@ function renderAdmin(data){
         ${r.bmw_qr_code ? `<button class="mbtn cancel" onclick="cancelMatch('${r.id}')">↩ 취소</button>` : ''}
         <button class="mbtn del" onclick="deleteItem('${r.id}')">삭제</button>
       </div></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 /* ── 스캐너 ── */
@@ -970,7 +982,8 @@ async function confirmMatch(){
     품번: scan.part,
     클레임번호: scan.claim,
     ro번호: scan.ro,
-    교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`
+    교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`,
+    디펙트코드: f[4] || null
   }).eq('id', id);
 
   if(error){ alert("저장 실패: "+error.message); return; }
@@ -1027,11 +1040,12 @@ function exportDashExcel(){
   // 현황 데이터를 보기 좋게 가공
   const rows = DD.map(r => {
     const ok = !!r.bmw_qr_code;
-    let collectDate = '';
+    let collectDate = ''; let exDc = '';
     if(ok && r.bmw_qr_code){
       const f = r.bmw_qr_code.split(',');
       if(f[7]?.length===6) collectDate = `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`;
       if(!collectDate && r.created_at) collectDate = r.created_at.slice(0,10);
+      exDc = f[4] || '';
     }
     const days = Math.floor((Date.now() - new Date(r.created_at)) / 86400000);
     return {
@@ -1040,6 +1054,7 @@ function exportDashExcel(){
       '차대번호':    r.차대번호,
       '품번':        r.품번,
       '품명':        r.품명,
+      '디펙트코드':  r.디펙트코드 || exDc,
       '작업자':      r.작업자,
       '수리항목':    r.수리항목 || '',
       '교환일':      r.교환일 || '',
