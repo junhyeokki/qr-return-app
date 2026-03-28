@@ -585,6 +585,30 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
         </div>
         <div class="empty" id="top10-empty" style="display:none;">품번 데이터가 없습니다.</div>
       </div>
+
+      <!-- 디펙트코드 TOP 10 -->
+      <div style="margin-top:24px;">
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:12px;letter-spacing:-0.3px;">🔖 디펙트코드 청구 TOP 10</div>
+        <div id="dc10-chart-wrap" style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;display:none;">
+          <canvas id="dc10-chart" style="max-height:320px;"></canvas>
+        </div>
+        <div id="dc10-table-wrap" style="display:none;">
+          <div class="tw">
+            <div class="table-scroll">
+              <table style="min-width:300px;">
+                <thead><tr>
+                  <th style="width:40px;">순위</th>
+                  <th>디펙트코드</th>
+                  <th style="text-align:center;">청구건수</th>
+                  <th style="text-align:center;">비율</th>
+                </tr></thead>
+                <tbody id="dc10-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="empty" id="dc10-empty" style="display:none;">디펙트코드 데이터가 없습니다.</div>
+      </div>
     </div>
 
   </div>
@@ -1200,6 +1224,7 @@ async function loadStats(){
   document.getElementById('stl').style.display='none';
   renderStats();
   renderTop10();
+  renderDc10();
 }
 
 function resetStats(){
@@ -1360,6 +1385,57 @@ function renderTop10(){
       <td style="font-size:12px;">${r.품명}</td>
       <td style="text-align:center;font-weight:700;color:var(--p);">${r.count}</td>
       <td style="text-align:center;font-size:12px;color:var(--dim2);">${Math.round(r.count/total*100)}%</td>
+    </tr>`).join('');
+}
+
+function renderDc10(){
+  const withCode=SD.map(r=>({
+    _dc:r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):'')
+  })).filter(r=>r._dc);
+  if(!withCode.length){
+    document.getElementById('dc10-empty').style.display='block';
+    document.getElementById('dc10-chart-wrap').style.display='none';
+    document.getElementById('dc10-table-wrap').style.display='none';
+    return;
+  }
+  const map={};
+  withCode.forEach(r=>{ map[r._dc]=(map[r._dc]||0)+1; });
+  const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  document.getElementById('dc10-empty').style.display='none';
+  document.getElementById('dc10-chart-wrap').style.display='block';
+  document.getElementById('dc10-table-wrap').style.display='block';
+  const total=withCode.length;
+  const ctx=document.getElementById('dc10-chart').getContext('2d');
+  if(window._dc10Chart) window._dc10Chart.destroy();
+  window._dc10Chart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:sorted.map(r=>r[0]),
+      datasets:[{
+        label:'청구건수',
+        data:sorted.map(r=>r[1]),
+        backgroundColor:sorted.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]),
+        borderRadius:6,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x}건`}}},
+      scales:{
+        x:{beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}},
+        y:{ticks:{color:'rgba(240,241,245,0.7)',font:{family:"'JetBrains Mono'",size:11}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('dc10-body').innerHTML=sorted.map(([code,cnt],i)=>`
+    <tr>
+      <td style="text-align:center;font-size:16px;">${medals[i]||`${i+1}`}</td>
+      <td style="font-family:var(--mono);font-size:13px;font-weight:700;">${code}</td>
+      <td style="text-align:center;font-weight:700;color:var(--p);">${cnt}</td>
+      <td style="text-align:center;font-size:12px;color:var(--dim2);">${Math.round(cnt/total*100)}%</td>
     </tr>`).join('');
 }
 
