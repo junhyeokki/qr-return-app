@@ -467,10 +467,6 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
               <input type="text" id="q-repair" placeholder="리콜 수리">
             </div>
           </div>
-          <div class="field">
-            <label>디펙트코드</label>
-            <input type="text" id="q-defect" placeholder="디펙트 번호 입력" oninput="this.value=this.value.toUpperCase()">
-          </div>
 
           <button class="qr-submit" onclick="generateQR()">QR 생성 및 저장</button>
           <div class="success-msg" id="q-success">✅ 서버 저장 완료!</div>
@@ -669,8 +665,7 @@ async function generateQR(){
     교환일:     document.getElementById('q-date').value,
     수량:       parseInt(document.getElementById('q-qty').value)||1,
     작업자:     document.getElementById('q-worker').value.trim(),
-    수리항목:   document.getElementById('q-repair').value.trim(),
-    디펙트코드: document.getElementById('q-defect').value.trim() || null
+    수리항목:   document.getElementById('q-repair').value.trim()
   };
   if(!rowData.ro번호||!rowData.차대번호||!rowData.품번||!rowData.품명||!rowData.교환일||!rowData.작업자){
     alert('필수 항목(RO번호, 차대번호, 품번, 품명, 교환일, 작업자)을 입력해주세요.'); return;
