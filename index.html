@@ -523,64 +523,74 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
     <div class="page" id="page-stats">
 
       <!-- 필터 -->
-      <div class="frow" style="flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+      <div class="frow" style="flex-wrap:wrap;gap:8px;margin-bottom:16px;">
         <span class="flbl">기간</span>
         <input class="finput" type="date" id="sts">
         <span class="fsep">~</span>
         <input class="finput" type="date" id="ste">
         <button class="btn btn-p" onclick="loadStats()">조회</button>
         <button class="btn btn-g" onclick="resetStats()">초기화</button>
-        <select id="st-mode" onchange="renderStats()" style="padding:7px 10px;background:var(--surf2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;">
-          <option value="month">월별</option>
-          <option value="day">일별</option>
-        </select>
       </div>
 
       <!-- 요약 카드 -->
-      <div class="stats" style="margin-bottom:20px;">
+      <div class="stats" style="margin-bottom:16px;">
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">총 청구건수</div><div class="sc-val" id="st-sv-total">—</div><div class="sc-bg">📦</div></div>
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">디펙트코드 종류</div><div class="sc-val" id="st-sv-codes">—</div><div class="sc-bg">🔖</div></div>
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">최다 청구 코드</div><div class="sc-val" id="st-sv-top" style="font-size:16px;">—</div><div class="sc-bg">🏆</div></div>
         <div class="sc"><div class="sc-accent"></div><div class="sc-label">미매칭(코드없음)</div><div class="sc-val" id="st-sv-na">—</div><div class="sc-bg">❓</div></div>
       </div>
 
-      <!-- ① 디펙트코드별 추이 카드 -->
-      <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;">
-        <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
-          <span style="font-size:14px;font-weight:800;letter-spacing:-0.3px;">📊 디펙트코드별 청구 추이</span>
-          <span style="font-size:11px;color:var(--dim);margin-left:auto;" id="st-mode-label">월별</span>
-        </div>
-        <div id="st-chart-wrap" style="padding:20px;display:none;">
-          <canvas id="stats-chart" style="max-height:300px;"></canvas>
-        </div>
-        <div id="st-table-wrap" style="display:none;">
-          <div class="loading" id="stl" style="display:none;"><div class="spinner"></div>불러오는 중...</div>
-          <div class="table-scroll">
-            <table id="st-table" style="min-width:400px;">
-              <thead id="st-head"></thead>
-              <tbody id="st-body"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="empty" id="st-empty" style="margin:20px;display:none;">디펙트코드가 있는 데이터가 없습니다. 출고서 매칭 후 확인해 주세요.</div>
+      <!-- 통계 탭 -->
+      <div class="tabs" style="margin-bottom:16px;">
+        <button class="tab ta" id="st-tab-defect" onclick="setStatsTab('defect')">📊 디펙트코드 추이</button>
+        <button class="tab"    id="st-tab-part"   onclick="setStatsTab('part')">🏆 품번 TOP 10</button>
+        <button class="tab"    id="st-tab-dc"     onclick="setStatsTab('dc')">🔖 디펙트코드 TOP 10</button>
       </div>
 
-      <!-- ② TOP 10 두 카드 나란히 -->
-      <div class="top10-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px;">
-
-        <!-- 품번 TOP 10 -->
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);min-width:0;">
-          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
-            <span style="font-size:14px;font-weight:800;letter-spacing:-0.3px;">🏆 품번 TOP 10</span>
+      <!-- 탭 패널: 디펙트코드 추이 -->
+      <div id="st-panel-defect">
+        <div class="frow" style="margin-bottom:14px;">
+          <span class="flbl">보기</span>
+          <select id="st-mode" onchange="renderStats()" style="padding:7px 10px;background:var(--surf2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;">
+            <option value="month">월별</option>
+            <option value="day">일별</option>
+          </select>
+        </div>
+        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
+          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;">
+            <span style="font-size:13px;font-weight:700;color:var(--dim2);">디펙트코드별 청구 건수</span>
+            <span style="font-size:11px;color:var(--dim);margin-left:auto;" id="st-mode-label">월별</span>
           </div>
-          <div id="top10-chart-wrap" style="padding:16px 20px;display:none;">
-            <canvas id="top10-chart" style="max-height:280px;"></canvas>
+          <div id="st-chart-wrap" style="padding:20px;display:none;">
+            <canvas id="stats-chart" style="max-height:320px;"></canvas>
+          </div>
+          <div id="st-table-wrap" style="display:none;">
+            <div class="loading" id="stl" style="display:none;"><div class="spinner"></div>불러오는 중...</div>
+            <div class="table-scroll">
+              <table id="st-table" style="min-width:400px;">
+                <thead id="st-head"></thead>
+                <tbody id="st-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="empty" id="st-empty" style="margin:20px;display:none;">디펙트코드가 있는 데이터가 없습니다.</div>
+        </div>
+      </div>
+
+      <!-- 탭 패널: 품번 TOP 10 -->
+      <div id="st-panel-part" style="display:none;">
+        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
+          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;font-weight:700;color:var(--dim2);">가장 많이 청구된 품번 순위</span>
+          </div>
+          <div id="top10-chart-wrap" style="padding:20px;display:none;">
+            <canvas id="top10-chart" style="max-height:320px;"></canvas>
           </div>
           <div id="top10-table-wrap" style="display:none;">
             <div class="table-scroll">
-              <table style="min-width:0;width:100%;">
+              <table style="min-width:360px;">
                 <thead><tr>
-                  <th style="width:36px;">순위</th>
+                  <th style="width:40px;">순위</th>
                   <th>품번</th>
                   <th>품명</th>
                   <th style="text-align:center;">건수</th>
@@ -592,20 +602,22 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
           </div>
           <div class="empty" id="top10-empty" style="margin:20px;display:none;">품번 데이터가 없습니다.</div>
         </div>
+      </div>
 
-        <!-- 디펙트코드 TOP 10 -->
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);min-width:0;">
+      <!-- 탭 패널: 디펙트코드 TOP 10 -->
+      <div id="st-panel-dc" style="display:none;">
+        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
           <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
-            <span style="font-size:14px;font-weight:800;letter-spacing:-0.3px;">🔖 디펙트코드 TOP 10</span>
+            <span style="font-size:13px;font-weight:700;color:var(--dim2);">가장 많이 청구된 디펙트코드 순위</span>
           </div>
-          <div id="dc10-chart-wrap" style="padding:16px 20px;display:none;">
-            <canvas id="dc10-chart" style="max-height:280px;"></canvas>
+          <div id="dc10-chart-wrap" style="padding:20px;display:none;">
+            <canvas id="dc10-chart" style="max-height:320px;"></canvas>
           </div>
           <div id="dc10-table-wrap" style="display:none;">
             <div class="table-scroll">
-              <table style="min-width:0;width:100%;">
+              <table style="min-width:300px;">
                 <thead><tr>
-                  <th style="width:36px;">순위</th>
+                  <th style="width:40px;">순위</th>
                   <th>디펙트코드</th>
                   <th style="text-align:center;">건수</th>
                   <th style="text-align:center;">%</th>
@@ -616,8 +628,8 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
           </div>
           <div class="empty" id="dc10-empty" style="margin:20px;display:none;">디펙트코드 데이터가 없습니다.</div>
         </div>
-
       </div>
+
     </div>
 
   </div>
@@ -1222,6 +1234,18 @@ function hL(p){ document.getElementById(p+'l').style.display='none'; }
 
 /* ── 통계 ── */
 let SD=[]; let statsChart=null; let top10Chart=null;
+let ST='defect'; // 현재 통계 탭
+
+function setStatsTab(t){
+  ST=t;
+  ['defect','part','dc'].forEach(k=>{
+    document.getElementById('st-tab-'+k).className='tab';
+    document.getElementById('st-panel-'+k).style.display='none';
+  });
+  const cls={defect:'ta',part:'tg',dc:'tr'};
+  document.getElementById('st-tab-'+t).classList.add(cls[t]);
+  document.getElementById('st-panel-'+t).style.display='block';
+}
 
 async function loadStats(){
   document.getElementById('stl').style.display='block';
