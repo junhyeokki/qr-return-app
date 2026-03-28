@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -353,6 +354,7 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
   <button class="nav on" id="nb-dash"  onclick="goPage('dash')"> <span class="ico">📊</span> 반납 현황</button>
   <button class="nav"    id="nb-qr"    onclick="goPage('qr')">   <span class="ico">🔲</span> QR 생성</button>
   <button class="nav"    id="nb-admin" onclick="goPage('admin')"><span class="ico">⚙️</span> QR 관리</button>
+  <button class="nav"    id="nb-stats" onclick="goPage('stats')"><span class="ico">📈</span> 통계</button>
   <div class="sb-footer" style="display:flex; justify-content:space-between; align-items:center;">
     <span>전주점 · junhyeokki</span>
     <button onclick="doLogout()" style="background:none; border:1px solid var(--border); color:var(--dim); font-size:10px; font-weight:700; border-radius:5px; padding:3px 8px; cursor:pointer; font-family:var(--sans);">로그아웃</button>
@@ -516,6 +518,50 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
       </div>
     </div>
 
+    <!-- ── 통계 ── -->
+    <div class="page" id="page-stats">
+      <div class="frow" style="flex-wrap:wrap;gap:8px;">
+        <span class="flbl">기간</span>
+        <input class="finput" type="date" id="sts">
+        <span class="fsep">~</span>
+        <input class="finput" type="date" id="ste">
+        <button class="btn btn-p" onclick="loadStats()">조회</button>
+        <button class="btn btn-g" onclick="resetStats()">초기화</button>
+        <select id="st-mode" onchange="renderStats()" style="padding:7px 10px;background:var(--surf2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;">
+          <option value="month">월별</option>
+          <option value="day">일별</option>
+        </select>
+      </div>
+
+      <!-- 요약 카드 -->
+      <div class="stats" style="margin-bottom:16px;">
+        <div class="sc"><div class="sc-accent"></div><div class="sc-label">총 청구건수</div><div class="sc-val" id="st-sv-total">—</div><div class="sc-bg">📦</div></div>
+        <div class="sc"><div class="sc-accent"></div><div class="sc-label">디펙트코드 종류</div><div class="sc-val" id="st-sv-codes">—</div><div class="sc-bg">🔖</div></div>
+        <div class="sc"><div class="sc-accent"></div><div class="sc-label">최다 청구 코드</div><div class="sc-val" id="st-sv-top" style="font-size:16px;">—</div><div class="sc-bg">🏆</div></div>
+        <div class="sc"><div class="sc-accent"></div><div class="sc-label">미매칭(코드없음)</div><div class="sc-val" id="st-sv-na">—</div><div class="sc-bg">❓</div></div>
+      </div>
+
+      <!-- 차트 -->
+      <div id="st-chart-wrap" style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;display:none;">
+        <div style="font-size:13px;font-weight:700;color:var(--dim2);margin-bottom:14px;">디펙트코드별 청구 건수</div>
+        <canvas id="stats-chart" style="max-height:360px;"></canvas>
+      </div>
+
+      <!-- 테이블 -->
+      <div id="st-table-wrap" style="display:none;">
+        <div class="tw">
+          <div class="loading" id="stl" style="display:none;"><div class="spinner"></div>불러오는 중...</div>
+          <div class="table-scroll">
+            <table id="st-table" style="min-width:400px;">
+              <thead id="st-head"></thead>
+              <tbody id="st-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="empty" id="st-empty" style="display:none;">디펙트코드가 있는 데이터가 없습니다. 출고서 매칭 후 확인해 주세요.</div>
+    </div>
+
   </div>
 </div>
 
@@ -525,6 +571,7 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
     <button class="bnav on" id="bn-dash"  onclick="goPage('dash')"> <span class="nico">📊</span>현황</button>
     <button class="bnav"    id="bn-qr"    onclick="goPage('qr')">   <span class="nico">🔲</span>QR생성</button>
     <button class="bnav"    id="bn-admin" onclick="goPage('admin')"><span class="nico">⚙️</span>관리</button>
+    <button class="bnav"    id="bn-stats" onclick="goPage('stats')"><span class="nico">📈</span>통계</button>
   </div>
 </div>
 
@@ -593,6 +640,8 @@ const w7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
 document.getElementById('ds').value=w7;
 document.getElementById('de').value=today;
 document.getElementById('q-date').value=today;
+document.getElementById('sts').value=new Date(new Date().getFullYear(),new Date().getMonth()-2,1).toISOString().slice(0,10);
+document.getElementById('ste').value=today;
 /* ── 로그인/로그아웃 ── */
 async function doLogin(){
   const email = document.getElementById('login-email').value.trim();
@@ -636,7 +685,7 @@ function goPage(n){
   document.getElementById('page-'+n).classList.add('on');
   document.getElementById('nb-'+n).classList.add('on');
   if(document.getElementById('bn-'+n)) document.getElementById('bn-'+n).classList.add('on');
-  const titles={dash:['반납 현황','고품 수거 현황 대시보드'],qr:['QR 생성','고품 QR 코드 생성'],admin:['QR 관리','출고서 매칭 및 관리']};
+  const titles={dash:['반납 현황','고품 수거 현황 대시보드'],qr:['QR 생성','고품 QR 코드 생성'],admin:['QR 관리','출고서 매칭 및 관리'],stats:['통계','디펙트코드별 청구 분석']};
   document.getElementById('tb-t').textContent=titles[n][0];
   document.getElementById('tb-s').textContent=titles[n][1];
   if(n==='admin'){
@@ -648,6 +697,10 @@ function goPage(n){
     document.getElementById('tb-r').innerHTML=`
       <button class="btn btn-excel" onclick="exportDashExcel()">📊 <span>엑셀 저장</span></button>`;
     if(!DD.length) loadDash();
+  } else if(n==='stats'){
+    document.getElementById('tb-r').innerHTML=`
+      <button class="btn btn-excel" onclick="exportStatsExcel()">📊 <span>엑셀 저장</span></button>`;
+    if(!SD.length) loadStats();
   } else {
     document.getElementById('tb-r').innerHTML='';
   }
@@ -1108,6 +1161,140 @@ async function deleteItem(id){ if(confirm("삭제하시겠습니까?")){ await s
 function toggleAll(s){ document.querySelectorAll('.row-check').forEach(c=>c.checked=s.checked); }
 function sL(p){ document.getElementById(p+'l').style.display='block'; document.getElementById(p==='d'?'dt':'at').style.display='none'; document.getElementById(p==='d'?'de2':'ae2').style.display='none'; }
 function hL(p){ document.getElementById(p+'l').style.display='none'; }
+
+/* ── 통계 ── */
+let SD=[]; let statsChart=null;
+
+async function loadStats(){
+  document.getElementById('stl').style.display='block';
+  const s=document.getElementById('sts').value, e=document.getElementById('ste').value;
+  let q=sb.from('qr_returns').select('교환일,디펙트코드,bmw_qr_code,created_at').order('교환일');
+  if(s) q=q.gte('교환일',s);
+  if(e) q=q.lte('교환일',e);
+  const{data}=await q; SD=data||[];
+  document.getElementById('stl').style.display='none';
+  renderStats();
+}
+
+function resetStats(){
+  document.getElementById('sts').value=new Date(new Date().getFullYear(),new Date().getMonth()-2,1).toISOString().slice(0,10);
+  document.getElementById('ste').value=today;
+  loadStats();
+}
+
+function renderStats(){
+  const mode=document.getElementById('st-mode').value;
+  const processed=SD.map(r=>({
+    _dc: r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):''),
+    _period: mode==='month'?(r.교환일||'').slice(0,7):(r.교환일||'')
+  })).filter(r=>r._period);
+
+  const withCode=processed.filter(r=>r._dc);
+  const noCode=processed.length-withCode.length;
+
+  // 요약 카드
+  const allCodes=[...new Set(withCode.map(r=>r._dc))];
+  const codeCount={};
+  withCode.forEach(r=>{ codeCount[r._dc]=(codeCount[r._dc]||0)+1; });
+  const topCode=allCodes.sort((a,b)=>(codeCount[b]||0)-(codeCount[a]||0))[0]||'—';
+  document.getElementById('st-sv-total').textContent=processed.length;
+  document.getElementById('st-sv-codes').textContent=allCodes.length;
+  document.getElementById('st-sv-top').textContent=topCode;
+  document.getElementById('st-sv-na').textContent=noCode;
+
+  if(!withCode.length){
+    document.getElementById('st-empty').style.display='block';
+    document.getElementById('st-chart-wrap').style.display='none';
+    document.getElementById('st-table-wrap').style.display='none';
+    return;
+  }
+  document.getElementById('st-empty').style.display='none';
+  document.getElementById('st-chart-wrap').style.display='block';
+  document.getElementById('st-table-wrap').style.display='block';
+
+  const periods=[...new Set(withCode.map(r=>r._period))].sort();
+  const codes=[...new Set(withCode.map(r=>r._dc))].sort();
+  const matrix={};
+  periods.forEach(p=>{ matrix[p]={}; codes.forEach(c=>matrix[p][c]=0); });
+  withCode.forEach(r=>{ matrix[r._period][r._dc]++; });
+
+  renderStatsChart(periods,codes,matrix);
+  renderStatsTable(periods,codes,matrix,mode);
+}
+
+const CHART_COLORS=['#f5a623','#7b8cde','#34c48a','#f06060','#5bc0de','#e8b4e8','#f0c040','#a8d8a8','#ff8c69','#87ceeb'];
+
+function renderStatsChart(periods,codes,matrix){
+  const ctx=document.getElementById('stats-chart').getContext('2d');
+  if(statsChart) statsChart.destroy();
+  statsChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:periods,
+      datasets:codes.map((c,i)=>({
+        label:c,
+        data:periods.map(p=>matrix[p][c]||0),
+        backgroundColor:CHART_COLORS[i%CHART_COLORS.length],
+        borderRadius:4,
+        borderSkipped:false
+      }))
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{labels:{color:'#f0f1f5',font:{family:"'Noto Sans KR'",size:12}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y}건`}}
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:'rgba(240,241,245,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{stacked:true,beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}}
+      }
+    }
+  });
+}
+
+function renderStatsTable(periods,codes,matrix,mode){
+  document.getElementById('st-head').innerHTML=`<tr>
+    <th>${mode==='month'?'월':'일자'}</th>
+    ${codes.map(c=>`<th style="text-align:center;">${c}</th>`).join('')}
+    <th style="text-align:center;">합계</th>
+  </tr>`;
+  document.getElementById('st-body').innerHTML=periods.map(p=>{
+    const total=codes.reduce((s,c)=>s+(matrix[p][c]||0),0);
+    return `<tr>
+      <td style="font-family:var(--mono);font-weight:700;">${p}</td>
+      ${codes.map(c=>`<td style="text-align:center;">${matrix[p][c]||'-'}</td>`).join('')}
+      <td style="text-align:center;font-weight:700;color:var(--p);">${total}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportStatsExcel(){
+  if(!SD.length){ alert('조회된 데이터가 없습니다.'); return; }
+  const mode=document.getElementById('st-mode').value;
+  const withCode=SD.map(r=>({
+    _dc:r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):''),
+    _period:mode==='month'?(r.교환일||'').slice(0,7):(r.교환일||'')
+  })).filter(r=>r._period&&r._dc);
+  if(!withCode.length){ alert('디펙트코드가 있는 데이터가 없습니다.'); return; }
+  const periods=[...new Set(withCode.map(r=>r._period))].sort();
+  const codes=[...new Set(withCode.map(r=>r._dc))].sort();
+  const matrix={};
+  periods.forEach(p=>{ matrix[p]={}; codes.forEach(c=>matrix[p][c]=0); });
+  withCode.forEach(r=>{ matrix[r._period][r._dc]++; });
+  const rows=periods.map(p=>{
+    const row={[mode==='month'?'월':'일자']:p};
+    codes.forEach(c=>row[c]=matrix[p][c]||0);
+    row['합계']=codes.reduce((s,c)=>s+(matrix[p][c]||0),0);
+    return row;
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:12},...codes.map(()=>({wch:14})),{wch:8}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'디펙트코드통계');
+  const s=document.getElementById('sts').value,e=document.getElementById('ste').value;
+  downloadExcel(wb,`디펙트코드통계_${mode==='month'?'월별':'일별'}_${s}_${e}.xlsx`);
+}
 </script>
 </body>
 </html>
