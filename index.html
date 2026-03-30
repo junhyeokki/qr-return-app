@@ -702,17 +702,11 @@ async function sendTelegramCollected(item, scan){
 /* ── 텔레그램 Edge Function 공통 호출 ── */
 async function sendTelegram(message){
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if(!session) return;
     const res = await fetch(
       'https://dgmmcypqrqciuoqvmymj.supabase.co/functions/v1/send-telegram',
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
       }
     );
