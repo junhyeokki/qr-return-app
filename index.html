@@ -8,7 +8,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -302,7 +301,6 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
   .field-row{grid-template-columns:1fr;}
   .topbar{padding:0 14px;}
   .match-row{grid-template-columns:70px 1fr 1fr 50px;}
-  .top10-grid{grid-template-columns:1fr !important;}
 }
 </style>
 </head>
@@ -355,7 +353,6 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
   <button class="nav on" id="nb-dash"  onclick="goPage('dash')"> <span class="ico">📊</span> 반납 현황</button>
   <button class="nav"    id="nb-qr"    onclick="goPage('qr')">   <span class="ico">🔲</span> QR 생성</button>
   <button class="nav"    id="nb-admin" onclick="goPage('admin')"><span class="ico">⚙️</span> QR 관리</button>
-  <button class="nav"    id="nb-stats" onclick="goPage('stats')"><span class="ico">📈</span> 통계</button>
   <div class="sb-footer" style="display:flex; justify-content:space-between; align-items:center;">
     <span>전주점 · junhyeokki</span>
     <button onclick="doLogout()" style="background:none; border:1px solid var(--border); color:var(--dim); font-size:10px; font-weight:700; border-radius:5px; padding:3px 8px; cursor:pointer; font-family:var(--sans);">로그아웃</button>
@@ -409,9 +406,9 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
           <table id="dt" style="display:none;">
             <thead><tr>
               <th>클레임번호 / RO번호</th>
+              <th>디펙트코드</th>
               <th>차대번호(뒤7)</th>
               <th>품명 / 품번</th>
-              <th>디펙트코드</th>
               <th>작업자</th>
               <th>교환일</th>
               <th>수거 상태</th>
@@ -507,8 +504,8 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
               <th style="width:28px;"><input type="checkbox" onclick="toggleAll(this)" style="accent-color:var(--p);"></th>
               <th>QR</th>
               <th>클레임번호 / RO번호</th>
-              <th>차대번호 / 품번</th>
               <th>디펙트코드</th>
+              <th>차대번호 / 품번</th>
               <th>매칭 / 상태</th>
               <th>액션</th>
             </tr></thead>
@@ -517,119 +514,6 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
         </div>
         <div class="empty" id="ae2" style="display:none;">데이터가 없습니다.</div>
       </div>
-    </div>
-
-    <!-- ── 통계 ── -->
-    <div class="page" id="page-stats">
-
-      <!-- 필터 -->
-      <div class="frow" style="flex-wrap:wrap;gap:8px;margin-bottom:16px;">
-        <span class="flbl">기간</span>
-        <input class="finput" type="date" id="sts">
-        <span class="fsep">~</span>
-        <input class="finput" type="date" id="ste">
-        <button class="btn btn-p" onclick="loadStats()">조회</button>
-        <button class="btn btn-g" onclick="resetStats()">초기화</button>
-      </div>
-
-      <!-- 요약 카드 -->
-      <div class="stats" style="margin-bottom:16px;">
-        <div class="sc"><div class="sc-accent"></div><div class="sc-label">총 청구건수</div><div class="sc-val" id="st-sv-total">—</div><div class="sc-bg">📦</div></div>
-        <div class="sc"><div class="sc-accent"></div><div class="sc-label">디펙트코드 종류</div><div class="sc-val" id="st-sv-codes">—</div><div class="sc-bg">🔖</div></div>
-        <div class="sc"><div class="sc-accent"></div><div class="sc-label">최다 청구 코드</div><div class="sc-val" id="st-sv-top" style="font-size:16px;">—</div><div class="sc-bg">🏆</div></div>
-        <div class="sc"><div class="sc-accent"></div><div class="sc-label">미매칭(코드없음)</div><div class="sc-val" id="st-sv-na">—</div><div class="sc-bg">❓</div></div>
-      </div>
-
-      <!-- 통계 탭 -->
-      <div class="tabs" style="margin-bottom:16px;">
-        <button class="tab ta" id="st-tab-defect" onclick="setStatsTab('defect')">📊 디펙트코드 추이</button>
-        <button class="tab"    id="st-tab-part"   onclick="setStatsTab('part')">🏆 품번 TOP 10</button>
-        <button class="tab"    id="st-tab-dc"     onclick="setStatsTab('dc')">🔖 디펙트코드 TOP 10</button>
-      </div>
-
-      <!-- 탭 패널: 디펙트코드 추이 -->
-      <div id="st-panel-defect">
-        <div class="frow" style="margin-bottom:14px;">
-          <span class="flbl">보기</span>
-          <select id="st-mode" onchange="renderStats()" style="padding:7px 10px;background:var(--surf2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:12px;cursor:pointer;">
-            <option value="month">월별</option>
-            <option value="day">일별</option>
-          </select>
-        </div>
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
-          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;">
-            <span style="font-size:13px;font-weight:700;color:var(--dim2);">디펙트코드별 청구 건수</span>
-            <span style="font-size:11px;color:var(--dim);margin-left:auto;" id="st-mode-label">월별</span>
-          </div>
-          <div id="st-chart-wrap" style="padding:20px;display:none;">
-            <canvas id="stats-chart" style="max-height:320px;"></canvas>
-          </div>
-          <div id="st-table-wrap" style="display:none;">
-            <div class="loading" id="stl" style="display:none;"><div class="spinner"></div>불러오는 중...</div>
-            <div class="table-scroll">
-              <table id="st-table" style="min-width:400px;">
-                <thead id="st-head"></thead>
-                <tbody id="st-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="empty" id="st-empty" style="margin:20px;display:none;">디펙트코드가 있는 데이터가 없습니다.</div>
-        </div>
-      </div>
-
-      <!-- 탭 패널: 품번 TOP 10 -->
-      <div id="st-panel-part" style="display:none;">
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
-          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
-            <span style="font-size:13px;font-weight:700;color:var(--dim2);">가장 많이 청구된 품번 순위</span>
-          </div>
-          <div id="top10-chart-wrap" style="padding:20px;display:none;">
-            <canvas id="top10-chart" style="max-height:320px;"></canvas>
-          </div>
-          <div id="top10-table-wrap" style="display:none;">
-            <div class="table-scroll">
-              <table style="min-width:360px;">
-                <thead><tr>
-                  <th style="width:40px;">순위</th>
-                  <th>품번</th>
-                  <th>품명</th>
-                  <th style="text-align:center;">건수</th>
-                  <th style="text-align:center;">%</th>
-                </tr></thead>
-                <tbody id="top10-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="empty" id="top10-empty" style="margin:20px;display:none;">품번 데이터가 없습니다.</div>
-        </div>
-      </div>
-
-      <!-- 탭 패널: 디펙트코드 TOP 10 -->
-      <div id="st-panel-dc" style="display:none;">
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);">
-          <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
-            <span style="font-size:13px;font-weight:700;color:var(--dim2);">가장 많이 청구된 디펙트코드 순위</span>
-          </div>
-          <div id="dc10-chart-wrap" style="padding:20px;display:none;">
-            <canvas id="dc10-chart" style="max-height:320px;"></canvas>
-          </div>
-          <div id="dc10-table-wrap" style="display:none;">
-            <div class="table-scroll">
-              <table style="min-width:300px;">
-                <thead><tr>
-                  <th style="width:40px;">순위</th>
-                  <th>디펙트코드</th>
-                  <th style="text-align:center;">건수</th>
-                  <th style="text-align:center;">%</th>
-                </tr></thead>
-                <tbody id="dc10-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="empty" id="dc10-empty" style="margin:20px;display:none;">디펙트코드 데이터가 없습니다.</div>
-        </div>
-      </div>
-
     </div>
 
   </div>
@@ -641,7 +525,6 @@ tbody tr:hover { background:rgba(255,255,255,0.02); }
     <button class="bnav on" id="bn-dash"  onclick="goPage('dash')"> <span class="nico">📊</span>현황</button>
     <button class="bnav"    id="bn-qr"    onclick="goPage('qr')">   <span class="nico">🔲</span>QR생성</button>
     <button class="bnav"    id="bn-admin" onclick="goPage('admin')"><span class="nico">⚙️</span>관리</button>
-    <button class="bnav"    id="bn-stats" onclick="goPage('stats')"><span class="nico">📈</span>통계</button>
   </div>
 </div>
 
@@ -710,8 +593,6 @@ const w7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
 document.getElementById('ds').value=w7;
 document.getElementById('de').value=today;
 document.getElementById('q-date').value=today;
-document.getElementById('sts').value=new Date(new Date().getFullYear(),new Date().getMonth()-2,1).toISOString().slice(0,10);
-document.getElementById('ste').value=today;
 /* ── 로그인/로그아웃 ── */
 async function doLogin(){
   const email = document.getElementById('login-email').value.trim();
@@ -755,7 +636,7 @@ function goPage(n){
   document.getElementById('page-'+n).classList.add('on');
   document.getElementById('nb-'+n).classList.add('on');
   if(document.getElementById('bn-'+n)) document.getElementById('bn-'+n).classList.add('on');
-  const titles={dash:['반납 현황','고품 수거 현황 대시보드'],qr:['QR 생성','고품 QR 코드 생성'],admin:['QR 관리','출고서 매칭 및 관리'],stats:['통계','디펙트코드별 청구 분석']};
+  const titles={dash:['반납 현황','고품 수거 현황 대시보드'],qr:['QR 생성','고품 QR 코드 생성'],admin:['QR 관리','출고서 매칭 및 관리']};
   document.getElementById('tb-t').textContent=titles[n][0];
   document.getElementById('tb-s').textContent=titles[n][1];
   if(n==='admin'){
@@ -767,10 +648,6 @@ function goPage(n){
     document.getElementById('tb-r').innerHTML=`
       <button class="btn btn-excel" onclick="exportDashExcel()">📊 <span>엑셀 저장</span></button>`;
     if(!DD.length) loadDash();
-  } else if(n==='stats'){
-    document.getElementById('tb-r').innerHTML=`
-      <button class="btn btn-excel" onclick="exportStatsExcel()">📊 <span>엑셀 저장</span></button>`;
-    if(!SD.length) loadStats();
   } else {
     document.getElementById('tb-r').innerHTML='';
   }
@@ -808,7 +685,6 @@ async function generateQR(){
 
 /* ── 텔레그램 알림 ── */
 async function sendTelegramCollected(item, scan){
-  const { CHAT_ID } = getTelegramConfig();
   const msg = [
     '✅ *수거 완료 알림*',
     '',
@@ -819,26 +695,33 @@ async function sendTelegramCollected(item, scan){
     `📝 *품명:* ${item.품명}`,
     `👤 *작업자:* ${item.작업자}`,
   ].join('\n');
-  try {
-    const BOT = getTelegramToken();
-    if(!BOT) return;
-    await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode:'Markdown' })
-    });
-  } catch(e){ console.warn('텔레그램 수거완료 알림 실패:', e); }
+  await sendTelegram(msg);
 }
 
-/* ── 텔레그램 설정 (아래 두 값을 실제 값으로 교체하세요) ── */
-function getTelegramConfig(){
-  const BOT_TOKEN = '';   // 예: '1234567890:ABC-...'
-  const CHAT_ID   = '';   // 예: '123456789'
-  return { BOT_TOKEN, CHAT_ID };
+/* ── 텔레그램 알림 ── */
+/* ── 텔레그램 Edge Function 공통 호출 ── */
+async function sendTelegram(message){
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    const res = await fetch(
+      'https://dgmmcypqrqciuoqvmymj.supabase.co/functions/v1/send-telegram',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': 'sb_publishable_bZOge88xhSpIsiWtq5IIvw_K_CleTao'
+        },
+        body: JSON.stringify({ message })
+      }
+    );
+    const data = await res.json();
+    console.log('텔레그램 응답:', data);
+  } catch(e){ console.warn('텔레그램 알림 실패:', e); }
 }
-function getTelegramToken(){ return getTelegramConfig().BOT_TOKEN; }
 
 async function sendTelegramAlert(item, id){
-  const { BOT_TOKEN, CHAT_ID } = getTelegramConfig();
   const msg = [
     '📦 *고품 QR 생성 알림*',
     '',
@@ -852,18 +735,7 @@ async function sendTelegramAlert(item, id){
     '',
     `🔗 [상세보기](https://junhyeokki.github.io/qr-return-app/result.html?id=${id})`
   ].join('\n');
-
-  try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text: msg,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch(e){ console.warn('텔레그램 알림 실패:', e); }
+  await sendTelegram(msg);
 }
 
 /* ── 경과일 계산 ── */
@@ -895,7 +767,7 @@ function resetDash(){ document.getElementById('ds').value=w7; document.getElemen
 function matchSearch(r, q){
   if(!q) return true;
   const kw = q.toLowerCase();
-  return [r.차대번호, r.품번, r.품명, r.작업자, r.ro번호, r.클레임번호, r.수리항목]
+  return [r.차대번호, r.품번, r.품명, r.작업자, r.ro번호, r.클레임번호, r.수리항목, r.디펙트코드]
     .some(v => v && String(v).toLowerCase().includes(kw));
 }
 
@@ -933,9 +805,8 @@ function renderDashRows(rows){
   if(!rows.length){ document.getElementById('de2').style.display='block'; return; }
   document.getElementById('dt').style.display='table';
   document.getElementById('db').innerHTML=rows.map(r=>{
-    const ok=!!r.bmw_qr_code; let cd=''; let dc='';
-    if(ok){ const f=r.bmw_qr_code.split(','); if(f[7]?.length===6) cd=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`; if(!cd&&r.created_at) cd=r.created_at.slice(0,10); dc=f[4]||''; }
-    const defectCode = r.디펙트코드 || dc;
+    const ok=!!r.bmw_qr_code; let cd='';
+    if(ok){ const f=r.bmw_qr_code.split(','); if(f[7]?.length===6) cd=`20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`; if(!cd&&r.created_at) cd=r.created_at.slice(0,10); }
     const elapsedHtml = !ok ? elapsedTag(r.created_at) : '';
     const days = !ok ? Math.floor((Date.now()-new Date(r.created_at))/86400000) : 0;
     const rowCls = !ok && days>=7 ? 'row-danger' : !ok && days>=3 ? 'row-warn' : '';
@@ -944,9 +815,13 @@ function renderDashRows(rows){
         <div class="claim-val">${r.클레임번호||'—'}</div>
         <div class="ro-val">RO: ${r.ro번호||'—'}</div>
       </td>
+      <td>
+        ${r.디펙트코드
+          ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--scan);">${r.디펙트코드}</span>`
+          : '<span style="color:var(--dim)">—</span>'}
+      </td>
       <td><span class="vin-val">${r.차대번호.slice(-7)}</span></td>
       <td><div style="font-weight:700;font-size:13px;">${r.품명}</div><div class="pn-val">${r.품번}</div></td>
-      <td style="font-family:var(--mono);font-size:12px;">${defectCode||'<span style="color:var(--dim)">—</span>'}</td>
       <td style="font-size:12px;color:var(--dim2);">${r.작업자}</td>
       <td style="font-family:var(--mono);font-size:12px;">${r.교환일||''}</td>
       <td>
@@ -973,9 +848,7 @@ function renderAdmin(data){
   hL('a');
   if(!data.length){ document.getElementById('ae2').style.display='block'; return; }
   document.getElementById('at').style.display='table';
-  document.getElementById('ab').innerHTML=data.map(r=>{
-    const adc = r.디펙트코드 || (r.bmw_qr_code ? (r.bmw_qr_code.split(',')[4]||'') : '');
-    return `
+  document.getElementById('ab').innerHTML=data.map(r=>`
     ${(()=>{ const d=!r.bmw_qr_code?Math.floor((Date.now()-new Date(r.created_at))/86400000):0; const rc=!r.bmw_qr_code&&d>=7?'row-danger':!r.bmw_qr_code&&d>=3?'row-warn':''; return `<tr id="row-${r.id}" class="${rc}">`; })()}
       <td><input type="checkbox" class="row-check" value="${r.id}" style="accent-color:var(--p);"></td>
       <td><img style="width:42px;border-radius:6px;border:1px solid var(--border);" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://junhyeokki.github.io/qr-return-app/result.html?id=${r.id}"></td>
@@ -984,10 +857,14 @@ function renderAdmin(data){
         <div class="ro-val">RO: ${r.ro번호||'—'}</div>
       </td>
       <td>
+        ${r.디펙트코드
+          ? `<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--scan);">${r.디펙트코드}</span>`
+          : '<span style="color:var(--dim);font-size:11px;">—</span>'}
+      </td>
+      <td>
         <div class="vin-val" style="font-size:12px;">${r.차대번호}</div>
         <div class="pn-val">${r.품번}</div>
       </td>
-      <td style="font-family:var(--mono);font-size:12px;">${adc||'<span style="color:var(--dim)">—</span>'}</td>
       <td id="mc-${r.id}"><div class="mc">
         ${r.bmw_qr_code
           ?'<span class="tag tok"><span class="tdot"></span>수거 완료</span>'
@@ -1000,8 +877,7 @@ function renderAdmin(data){
         ${r.bmw_qr_code ? `<button class="mbtn cancel" onclick="cancelMatch('${r.id}')">↩ 취소</button>` : ''}
         <button class="mbtn del" onclick="deleteItem('${r.id}')">삭제</button>
       </div></td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 }
 
 /* ── 스캐너 ── */
@@ -1012,10 +888,11 @@ function startScan(id, vin, part, claim, ro){
     const f=decoded.split(',');
     if(f.length<15) return alert("올바른 QR 형식이 아닙니다.");
 
-    const scClaim = f[1]  || '';
-    const scVin   = f[2]  || '';
-    const scPart  = f[9]  || '';
-    const scRO    = f[14] || '';
+    const scClaim  = f[1]  || '';
+    const scVin    = f[2]  || '';
+    const scDefect = f[4]  || '';
+    const scPart   = f[9]  || '';
+    const scRO     = f[14] || '';
 
     // 각 항목 일치 여부
     const claimOk = claim ? (claim.replace(/\s/g,'') === scClaim.replace(/\s/g,'')) : null;
@@ -1029,7 +906,7 @@ function startScan(id, vin, part, claim, ro){
     showMatchModal({
       id, decoded,
       orig:  { claim, ro, vin, part },
-      scan:  { claim:scClaim, ro:scRO, vin:scVin, part:scPart },
+      scan:  { claim:scClaim, ro:scRO, vin:scVin, part:scPart, defect:scDefect },
       match: { claim:claimOk, ro:roOk, vin:vinOk, part:partOk },
       scData: f
     });
@@ -1100,8 +977,8 @@ async function confirmMatch(){
     품번: scan.part,
     클레임번호: scan.claim,
     ro번호: scan.ro,
-    교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`,
-    디펙트코드: f[4] || null
+    디펙트코드: scan.defect,
+    교환일: `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`
   }).eq('id', id);
 
   if(error){ alert("저장 실패: "+error.message); return; }
@@ -1158,21 +1035,20 @@ function exportDashExcel(){
   // 현황 데이터를 보기 좋게 가공
   const rows = DD.map(r => {
     const ok = !!r.bmw_qr_code;
-    let collectDate = ''; let exDc = '';
+    let collectDate = '';
     if(ok && r.bmw_qr_code){
       const f = r.bmw_qr_code.split(',');
       if(f[7]?.length===6) collectDate = `20${f[7].substring(0,2)}-${f[7].substring(2,4)}-${f[7].substring(4,6)}`;
       if(!collectDate && r.created_at) collectDate = r.created_at.slice(0,10);
-      exDc = f[4] || '';
     }
     const days = Math.floor((Date.now() - new Date(r.created_at)) / 86400000);
     return {
       '클레임번호':  r.클레임번호 || '',
       'RO번호':      r.ro번호 || '',
+      '디펙트코드':  r.디펙트코드 || '',
       '차대번호':    r.차대번호,
       '품번':        r.품번,
       '품명':        r.품명,
-      '디펙트코드':  r.디펙트코드 || exDc,
       '작업자':      r.작업자,
       '수리항목':    r.수리항목 || '',
       '교환일':      r.교환일 || '',
@@ -1231,274 +1107,6 @@ async function deleteItem(id){ if(confirm("삭제하시겠습니까?")){ await s
 function toggleAll(s){ document.querySelectorAll('.row-check').forEach(c=>c.checked=s.checked); }
 function sL(p){ document.getElementById(p+'l').style.display='block'; document.getElementById(p==='d'?'dt':'at').style.display='none'; document.getElementById(p==='d'?'de2':'ae2').style.display='none'; }
 function hL(p){ document.getElementById(p+'l').style.display='none'; }
-
-/* ── 통계 ── */
-let SD=[]; let statsChart=null; let top10Chart=null;
-let ST='defect'; // 현재 통계 탭
-
-function setStatsTab(t){
-  ST=t;
-  ['defect','part','dc'].forEach(k=>{
-    document.getElementById('st-tab-'+k).className='tab';
-    document.getElementById('st-panel-'+k).style.display='none';
-  });
-  const cls={defect:'ta',part:'tg',dc:'tr'};
-  document.getElementById('st-tab-'+t).classList.add(cls[t]);
-  document.getElementById('st-panel-'+t).style.display='block';
-}
-
-async function loadStats(){
-  document.getElementById('stl').style.display='block';
-  const s=document.getElementById('sts').value, e=document.getElementById('ste').value;
-  let q=sb.from('qr_returns').select('교환일,디펙트코드,bmw_qr_code,created_at,품번,품명').order('교환일');
-  if(s) q=q.gte('교환일',s);
-  if(e) q=q.lte('교환일',e);
-  const{data}=await q; SD=data||[];
-  document.getElementById('stl').style.display='none';
-  renderStats();
-  renderTop10();
-  renderDc10();
-}
-
-function resetStats(){
-  document.getElementById('sts').value=new Date(new Date().getFullYear(),new Date().getMonth()-2,1).toISOString().slice(0,10);
-  document.getElementById('ste').value=today;
-  loadStats();
-}
-
-function renderStats(){
-  const mode=document.getElementById('st-mode').value;
-  document.getElementById('st-mode-label').textContent=mode==='month'?'월별':'일별';
-  const processed=SD.map(r=>({
-    _dc: r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):''),
-    _period: mode==='month'?(r.교환일||'').slice(0,7):(r.교환일||'')
-  })).filter(r=>r._period);
-
-  const withCode=processed.filter(r=>r._dc);
-  const noCode=processed.length-withCode.length;
-
-  // 요약 카드
-  const allCodes=[...new Set(withCode.map(r=>r._dc))];
-  const codeCount={};
-  withCode.forEach(r=>{ codeCount[r._dc]=(codeCount[r._dc]||0)+1; });
-  const topCode=allCodes.sort((a,b)=>(codeCount[b]||0)-(codeCount[a]||0))[0]||'—';
-  document.getElementById('st-sv-total').textContent=processed.length;
-  document.getElementById('st-sv-codes').textContent=allCodes.length;
-  document.getElementById('st-sv-top').textContent=topCode;
-  document.getElementById('st-sv-na').textContent=noCode;
-
-  if(!withCode.length){
-    document.getElementById('st-empty').style.display='block';
-    document.getElementById('st-chart-wrap').style.display='none';
-    document.getElementById('st-table-wrap').style.display='none';
-    return;
-  }
-  document.getElementById('st-empty').style.display='none';
-  document.getElementById('st-chart-wrap').style.display='block';
-  document.getElementById('st-table-wrap').style.display='block';
-
-  const periods=[...new Set(withCode.map(r=>r._period))].sort();
-  const codes=[...new Set(withCode.map(r=>r._dc))].sort();
-  const matrix={};
-  periods.forEach(p=>{ matrix[p]={}; codes.forEach(c=>matrix[p][c]=0); });
-  withCode.forEach(r=>{ matrix[r._period][r._dc]++; });
-
-  renderStatsChart(periods,codes,matrix);
-  renderStatsTable(periods,codes,matrix,mode);
-}
-
-const CHART_COLORS=['#f5a623','#7b8cde','#34c48a','#f06060','#5bc0de','#e8b4e8','#f0c040','#a8d8a8','#ff8c69','#87ceeb'];
-
-function renderStatsChart(periods,codes,matrix){
-  const ctx=document.getElementById('stats-chart').getContext('2d');
-  if(statsChart) statsChart.destroy();
-  statsChart=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:periods,
-      datasets:codes.map((c,i)=>({
-        label:c,
-        data:periods.map(p=>matrix[p][c]||0),
-        backgroundColor:CHART_COLORS[i%CHART_COLORS.length],
-        borderRadius:4,
-        borderSkipped:false
-      }))
-    },
-    options:{
-      responsive:true,
-      plugins:{
-        legend:{labels:{color:'#f0f1f5',font:{family:"'Noto Sans KR'",size:12}}},
-        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y}건`}}
-      },
-      scales:{
-        x:{stacked:true,ticks:{color:'rgba(240,241,245,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{stacked:true,beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}}
-      }
-    }
-  });
-}
-
-function renderStatsTable(periods,codes,matrix,mode){
-  document.getElementById('st-head').innerHTML=`<tr>
-    <th>${mode==='month'?'월':'일자'}</th>
-    ${codes.map(c=>`<th style="text-align:center;">${c}</th>`).join('')}
-    <th style="text-align:center;">합계</th>
-  </tr>`;
-  document.getElementById('st-body').innerHTML=periods.map(p=>{
-    const total=codes.reduce((s,c)=>s+(matrix[p][c]||0),0);
-    return `<tr>
-      <td style="font-family:var(--mono);font-weight:700;">${p}</td>
-      ${codes.map(c=>`<td style="text-align:center;">${matrix[p][c]||'-'}</td>`).join('')}
-      <td style="text-align:center;font-weight:700;color:var(--p);">${total}</td>
-    </tr>`;
-  }).join('');
-}
-
-function renderTop10(){
-  if(!SD.length){
-    document.getElementById('top10-empty').style.display='block';
-    document.getElementById('top10-chart-wrap').style.display='none';
-    document.getElementById('top10-table-wrap').style.display='none';
-    return;
-  }
-  // 품번별 집계
-  const map={};
-  SD.forEach(r=>{
-    if(!r.품번) return;
-    if(!map[r.품번]) map[r.품번]={품번:r.품번, 품명:r.품명||'', count:0};
-    map[r.품번].count++;
-  });
-  const sorted=Object.values(map).sort((a,b)=>b.count-a.count).slice(0,10);
-  if(!sorted.length){
-    document.getElementById('top10-empty').style.display='block';
-    document.getElementById('top10-chart-wrap').style.display='none';
-    document.getElementById('top10-table-wrap').style.display='none';
-    return;
-  }
-  document.getElementById('top10-empty').style.display='none';
-  document.getElementById('top10-chart-wrap').style.display='block';
-  document.getElementById('top10-table-wrap').style.display='block';
-
-  const total=SD.filter(r=>r.품번).length;
-
-  // 차트
-  const ctx=document.getElementById('top10-chart').getContext('2d');
-  if(top10Chart) top10Chart.destroy();
-  top10Chart=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:sorted.map(r=>r.품번),
-      datasets:[{
-        label:'청구건수',
-        data:sorted.map(r=>r.count),
-        backgroundColor:sorted.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]),
-        borderRadius:6,
-        borderSkipped:false
-      }]
-    },
-    options:{
-      indexAxis:'y',
-      responsive:true,
-      plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x}건`}}
-      },
-      scales:{
-        x:{beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}},
-        y:{ticks:{color:'rgba(240,241,245,0.7)',font:{family:"'JetBrains Mono'",size:11}},grid:{color:'rgba(255,255,255,0.04)'}}
-      }
-    }
-  });
-
-  // 테이블
-  const medals=['🥇','🥈','🥉'];
-  document.getElementById('top10-body').innerHTML=sorted.map((r,i)=>`
-    <tr>
-      <td style="text-align:center;font-size:16px;">${medals[i]||`${i+1}`}</td>
-      <td style="font-family:var(--mono);font-size:12px;">${r.품번}</td>
-      <td style="font-size:12px;">${r.품명}</td>
-      <td style="text-align:center;font-weight:700;color:var(--p);">${r.count}</td>
-      <td style="text-align:center;font-size:12px;color:var(--dim2);">${Math.round(r.count/total*100)}%</td>
-    </tr>`).join('');
-}
-
-function renderDc10(){
-  const withCode=SD.map(r=>({
-    _dc:r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):'')
-  })).filter(r=>r._dc);
-  if(!withCode.length){
-    document.getElementById('dc10-empty').style.display='block';
-    document.getElementById('dc10-chart-wrap').style.display='none';
-    document.getElementById('dc10-table-wrap').style.display='none';
-    return;
-  }
-  const map={};
-  withCode.forEach(r=>{ map[r._dc]=(map[r._dc]||0)+1; });
-  const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  document.getElementById('dc10-empty').style.display='none';
-  document.getElementById('dc10-chart-wrap').style.display='block';
-  document.getElementById('dc10-table-wrap').style.display='block';
-  const total=withCode.length;
-  const ctx=document.getElementById('dc10-chart').getContext('2d');
-  if(window._dc10Chart) window._dc10Chart.destroy();
-  window._dc10Chart=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:sorted.map(r=>r[0]),
-      datasets:[{
-        label:'청구건수',
-        data:sorted.map(r=>r[1]),
-        backgroundColor:sorted.map((_,i)=>CHART_COLORS[i%CHART_COLORS.length]),
-        borderRadius:6,
-        borderSkipped:false
-      }]
-    },
-    options:{
-      indexAxis:'y',
-      responsive:true,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x}건`}}},
-      scales:{
-        x:{beginAtZero:true,ticks:{color:'rgba(240,241,245,0.6)',stepSize:1},grid:{color:'rgba(255,255,255,0.06)'}},
-        y:{ticks:{color:'rgba(240,241,245,0.7)',font:{family:"'JetBrains Mono'",size:11}},grid:{color:'rgba(255,255,255,0.04)'}}
-      }
-    }
-  });
-  const medals=['🥇','🥈','🥉'];
-  document.getElementById('dc10-body').innerHTML=sorted.map(([code,cnt],i)=>`
-    <tr>
-      <td style="text-align:center;font-size:16px;">${medals[i]||`${i+1}`}</td>
-      <td style="font-family:var(--mono);font-size:13px;font-weight:700;">${code}</td>
-      <td style="text-align:center;font-weight:700;color:var(--p);">${cnt}</td>
-      <td style="text-align:center;font-size:12px;color:var(--dim2);">${Math.round(cnt/total*100)}%</td>
-    </tr>`).join('');
-}
-
-function exportStatsExcel(){
-  if(!SD.length){ alert('조회된 데이터가 없습니다.'); return; }
-  const mode=document.getElementById('st-mode').value;
-  const withCode=SD.map(r=>({
-    _dc:r.디펙트코드||(r.bmw_qr_code?(r.bmw_qr_code.split(',')[4]||''):''),
-    _period:mode==='month'?(r.교환일||'').slice(0,7):(r.교환일||'')
-  })).filter(r=>r._period&&r._dc);
-  if(!withCode.length){ alert('디펙트코드가 있는 데이터가 없습니다.'); return; }
-  const periods=[...new Set(withCode.map(r=>r._period))].sort();
-  const codes=[...new Set(withCode.map(r=>r._dc))].sort();
-  const matrix={};
-  periods.forEach(p=>{ matrix[p]={}; codes.forEach(c=>matrix[p][c]=0); });
-  withCode.forEach(r=>{ matrix[r._period][r._dc]++; });
-  const rows=periods.map(p=>{
-    const row={[mode==='month'?'월':'일자']:p};
-    codes.forEach(c=>row[c]=matrix[p][c]||0);
-    row['합계']=codes.reduce((s,c)=>s+(matrix[p][c]||0),0);
-    return row;
-  });
-  const ws=XLSX.utils.json_to_sheet(rows);
-  ws['!cols']=[{wch:12},...codes.map(()=>({wch:14})),{wch:8}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'디펙트코드통계');
-  const s=document.getElementById('sts').value,e=document.getElementById('ste').value;
-  downloadExcel(wb,`디펙트코드통계_${mode==='month'?'월별':'일별'}_${s}_${e}.xlsx`);
-}
 </script>
 </body>
 </html>
